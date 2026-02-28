@@ -18,33 +18,47 @@ export default function SuccessPage() {
 
   // Estado final que usará la UI
   const [registration, setRegistration] = useState(stateRegistration || null);
-  const [loading, setLoading] = useState(!stateRegistration);
 
-  // Guard: si no hay state, necesitamos code
-  const shouldFetch = useMemo(() => !stateRegistration && !!codeFromUrl, [stateRegistration, codeFromUrl]);
+  // Si hay code en URL, queremos fetch para soportar refresh / link compartido.
+  const [loading, setLoading] = useState(!!codeFromUrl && !stateRegistration);
+
+  // Guard: solo hacemos fetch si hay code en URL
+  const shouldFetch = useMemo(() => !!codeFromUrl, [codeFromUrl]);
+
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!shouldFetch) return;
+
     let cancelled = false;
 
     async function fetchByCode() {
       try {
+        setError("");
         setLoading(true);
 
         // ✅ IMPORTANTE:
-        // Este endpoint tiene que existir en tu backend:
-        // GET /api/registrations/confirmation/{code}
-        const res = await axios.get(`${API}/registrations/confirm/${encodeURIComponent(codeFromUrl)}`);
+        // Este endpoint existe en tu backend:
+        // GET /api/registrations/confirm/{code}
+        const res = await axios.get(
+          `${API}/registrations/confirm/${encodeURIComponent(codeFromUrl)}`
+        );
 
         if (!cancelled) setRegistration(res.data);
       } catch (err) {
-        // Si falla, dejamos registration en null -> redirige al home
-        if (!cancelled) setRegistration(null);
+        // ⚠️ No pongas registration en null aquí, porque en refresh te redirige al home.
+        // Mejor mostramos error y dejamos lo que haya (o se quedará null y mostramos mensaje).
+        const msg =
+          err?.response?.data?.detail ||
+          "No se pudo cargar el registro. Verifica el código de confirmación.";
+
+        if (!cancelled) setError(msg);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    if (shouldFetch) fetchByCode();
+    fetchByCode();
 
     return () => {
       cancelled = true;
@@ -63,9 +77,38 @@ export default function SuccessPage() {
     );
   }
 
-  // Si no hay registration, volver al home
+  // Si no hay registration (y no está cargando), mostramos un mensaje en vez de mandar al home
+  // Esto es mejor UX si la gente abre el link tarde o el code está mal.
   if (!registration) {
-    return <Navigate to="/" replace />;
+    return (
+      <div className="app-container min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="form-card p-8 md:p-12 text-center max-w-2xl w-full">
+          <h1 className="header-title text-2xl md:text-3xl text-white mb-3">
+            No pudimos cargar tu registro
+          </h1>
+          <p className="text-gray-400 mb-6">
+            {error || "El enlace puede estar incompleto o el código no existe."}
+          </p>
+
+          {codeFromUrl && (
+            <div className="bg-[#1a1c1e] p-4 rounded-lg border border-orange-500/30 mb-6">
+              <p className="text-gray-400 text-sm mb-1">Código detectado</p>
+              <p className="text-xl font-bold text-orange-500 tracking-wider">
+                {codeFromUrl}
+              </p>
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate("/")}
+            className="btn-secondary w-full flex items-center justify-center gap-2"
+          >
+            Volver al Registro
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const paymentMethodLabel =
@@ -94,6 +137,13 @@ export default function SuccessPage() {
             ¡Registro Exitoso!
           </h1>
           <p className="text-gray-400 mb-8">Su registro ha sido procesado correctamente</p>
+
+          {/* Optional error (non-blocking) */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-200 p-4 rounded-lg mb-6 text-sm">
+              {error}
+            </div>
+          )}
 
           {/* Confirmation Code */}
           <div className="bg-[#1a1c1e] p-6 rounded-lg border border-orange-500/30 mb-8">
