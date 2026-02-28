@@ -33,7 +33,7 @@ export default function SuccessPage() {
         // ✅ IMPORTANTE:
         // Este endpoint tiene que existir en tu backend:
         // GET /api/registrations/confirmation/{code}
-        const res = await axios.get(`${API}/registrations/confirmation/${encodeURIComponent(codeFromUrl)}`);
+        const res = await axios.get(`${API}/registrations/confirm/${encodeURIComponent(codeFromUrl)}`);
 
         if (!cancelled) setRegistration(res.data);
       } catch (err) {
