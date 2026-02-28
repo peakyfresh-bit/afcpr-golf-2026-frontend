@@ -1,0 +1,344 @@
+/* AFCPR Golf Tournament Styles */
+
+/* Layout */
+.app-container {
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, #2d3135 0%, #1a1c1e 100%);
+}
+
+/* Header styles */
+.header-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+/* Form card styles */
+.form-card {
+  background-color: #232629;
+  border: 1px solid #374151;
+  border-radius: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.form-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(249, 115, 22, 0.5), transparent);
+}
+
+/* Input styles */
+.custom-input {
+  background-color: #1a1c1e;
+  border: 1px solid #374151;
+  color: #f3f4f6;
+  height: 56px;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  padding: 0 1rem;
+  width: 100%;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.custom-input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+}
+
+.custom-input::placeholder {
+  color: #6b7280;
+}
+
+.custom-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Select styles */
+.custom-select {
+  background-color: #1a1c1e;
+  border: 1px solid #374151;
+  color: #f3f4f6;
+  height: 56px;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  padding: 0 1rem;
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  cursor: pointer;
+}
+
+.custom-select:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: #f97316;
+  color: white;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  height: 56px;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: #ea580c;
+  box-shadow: 0 0 30px rgba(249, 115, 22, 0.5);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: #9ca3af;
+  border: 1px solid #374151;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  height: 56px;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+  color: #f3f4f6;
+}
+
+/* Radio button styles */
+.radio-option {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background-color: #1a1c1e;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.radio-option:hover {
+  border-color: #4b5563;
+}
+
+.radio-option.selected {
+  border-color: #f97316;
+  background-color: rgba(249, 115, 22, 0.1);
+}
+
+.radio-option input {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #4b5563;
+  border-radius: 50%;
+  margin-right: 0.75rem;
+  position: relative;
+  cursor: pointer;
+}
+
+.radio-option input:checked {
+  border-color: #f97316;
+}
+
+.radio-option input:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background-color: #f97316;
+  border-radius: 50%;
+}
+
+/* Checkbox styles */
+.custom-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.custom-checkbox input {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border: 2px solid #4b5563;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.custom-checkbox input:checked {
+  background-color: #f97316;
+  border-color: #f97316;
+}
+
+.custom-checkbox input:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-pending {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.badge-paid {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.badge-cancelled {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Table styles */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th {
+  text-align: left;
+  padding: 1rem;
+  background-color: #2d3135;
+  color: #9ca3af;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #374151;
+}
+
+.admin-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #374151;
+}
+
+.admin-table tr:hover td {
+  background-color: rgba(249, 115, 22, 0.05);
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-content {
+  background-color: #232629;
+  border: 1px solid #374151;
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+}
+
+/* Success animation */
+@keyframes checkmark {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.success-checkmark {
+  animation: checkmark 0.5s ease-out forwards;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(249, 115, 22, 0.3);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .custom-input,
+  .custom-select,
+  .btn-primary,
+  .btn-secondary {
+    height: 48px;
+  }
+}
+
+/* Card reveal animation */
+@keyframes cardReveal {
+  from { opacity: 0; filter: blur(10px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+.card-number-reveal {
+  animation: cardReveal 0.3s ease-out forwards;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-size: 1.5rem;
+  letter-spacing: 0.15em;
+  color: #f97316;
+}
