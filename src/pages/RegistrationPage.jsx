@@ -178,7 +178,9 @@ export default function RegistrationPage() {
 
       const response = await axios.post(`${API}/registrations`, payload);
 
-      navigate("/success", { state: { registration: response.data } });
+      navigate(`/success?code=${response.data.confirmation_code}`, {
+      state: { registration: response.data },
+  });
     } catch (error) {
       const message = error.response?.data?.detail || "Error al procesar el registro";
       toast.error(message);

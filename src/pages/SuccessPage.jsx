@@ -1,22 +1,81 @@
-import { useLocation, useNavigate, Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, Navigate, useSearchParams } from "react-router-dom";
+import axios from "axios";
 import { CheckCircle, Users, Building2, CreditCard, Mail, ArrowRight } from "lucide-react";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function SuccessPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const registration = location.state?.registration;
+  const [searchParams] = useSearchParams();
 
+  // 1) Si venimos desde submit, esto existe:
+  const stateRegistration = location.state?.registration;
+
+  // 2) Si refrescamos, el state se pierde; usamos ?code=
+  const codeFromUrl = searchParams.get("code");
+
+  // Estado final que usará la UI
+  const [registration, setRegistration] = useState(stateRegistration || null);
+  const [loading, setLoading] = useState(!stateRegistration);
+
+  // Guard: si no hay state, necesitamos code
+  const shouldFetch = useMemo(() => !stateRegistration && !!codeFromUrl, [stateRegistration, codeFromUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchByCode() {
+      try {
+        setLoading(true);
+
+        // ✅ IMPORTANTE:
+        // Este endpoint tiene que existir en tu backend:
+        // GET /api/registrations/confirmation/{code}
+        const res = await axios.get(`${API}/registrations/confirmation/${encodeURIComponent(codeFromUrl)}`);
+
+        if (!cancelled) setRegistration(res.data);
+      } catch (err) {
+        // Si falla, dejamos registration en null -> redirige al home
+        if (!cancelled) setRegistration(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    if (shouldFetch) fetchByCode();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldFetch, codeFromUrl]);
+
+  // Si está cargando, mostramos algo simple
+  if (loading) {
+    return (
+      <div className="app-container min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="form-card p-8 md:p-12 text-center max-w-2xl w-full">
+          <p className="text-white text-xl font-semibold mb-2">Cargando registro...</p>
+          <p className="text-gray-400">Un momento por favor.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay registration, volver al home
   if (!registration) {
     return <Navigate to="/" replace />;
   }
 
-  const paymentMethodLabel = {
-    cheque: "Cheque",
-    visa: "Visa",
-    mastercard: "Mastercard",
-  }[registration.payment_method] || registration.payment_method;
+  const paymentMethodLabel =
+    {
+      cheque: "Cheque",
+      visa: "Visa",
+      mastercard: "Mastercard",
+    }[registration.payment_method] || registration.payment_method;
 
-  const validPlayers = registration.players?.filter(p => p.name?.trim()) || [];
+  const validPlayers = registration.players?.filter((p) => p.name?.trim()) || [];
 
   return (
     <div className="app-container min-h-screen flex items-center justify-center px-4 py-8" data-testid="success-page">
@@ -53,12 +112,16 @@ export default function SuccessPage() {
                 <span className="text-gray-400 text-sm font-medium">Equipo</span>
               </div>
               <div className="space-y-2">
-                {validPlayers.map((player, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <span className="text-white">{player.name}</span>
-                    <span className="text-gray-400">{player.shirt_size}</span>
-                  </div>
-                ))}
+                {validPlayers.length ? (
+                  validPlayers.map((player, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span className="text-white">{player.name}</span>
+                      <span className="text-gray-400">{player.shirt_size}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400 text-sm">No hay jugadores registrados.</p>
+                )}
               </div>
             </div>
 
@@ -84,9 +147,7 @@ export default function SuccessPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-white">{paymentMethodLabel}</p>
-                  {registration.last4 && (
-                    <p className="text-gray-400 text-sm">•••• {registration.last4}</p>
-                  )}
+                  {registration.last4 && <p className="text-gray-400 text-sm">•••• {registration.last4}</p>}
                 </div>
                 <p className="text-2xl font-bold text-orange-500" data-testid="payment-amount">
                   ${registration.amount?.toLocaleString()}
