@@ -122,6 +122,22 @@ export default function AdminDashboard() {
     return pm || "-";
   };
 
+  // ✅ Contact: en tu Mongo existe "phone" (no contact_name).
+  const contactLabel = (it) => {
+    return it?.phone || it?.phone_number || it?.contactPhone || it?.email || "-";
+  };
+
+  // ✅ Shirt sizes: vienen dentro de players (Array)
+  const shirtSizesLabel = (it) => {
+    const players = Array.isArray(it?.players) ? it.players : [];
+    const sizes = players
+      .map((p) => p?.shirt_size || p?.shirtSize || p?.shirt || p?.size)
+      .filter(Boolean)
+      .map((s) => String(s).toUpperCase().trim());
+
+    return sizes.length ? sizes.join(", ") : "-";
+  };
+
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -164,15 +180,15 @@ export default function AdminDashboard() {
               <div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <h1
-                  className="text-xl sm:text-2xl font-semibold tracking-tight"
-                  style={{
-                    background: `linear-gradient(135deg, ${THEME.orange}, ${THEME.orange2})`,
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}
-                >
-                  AFCPR Golf Tournament 2026 — 7th Edition
-                </h1>
+                    className="text-xl sm:text-2xl font-semibold tracking-tight"
+                    style={{
+                      background: `linear-gradient(135deg, ${THEME.orange}, ${THEME.orange2})`,
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    AFCPR Golf Tournament 2026 — 7th Edition
+                  </h1>
                 </div>
                 <p className="text-sm mt-1" style={{ color: THEME.subtext }}>
                   Admin Dashboard — Registrations Overview
@@ -296,7 +312,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="w-full overflow-x-auto">
-              <table className="min-w-[900px] w-full text-sm">
+              <table className="min-w-[980px] w-full text-sm">
                 <thead>
                   <tr
                     style={{
@@ -314,6 +330,9 @@ export default function AdminDashboard() {
                       Email
                     </th>
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Shirt Size(s)
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Payment
                     </th>
                     <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
@@ -328,31 +347,24 @@ export default function AdminDashboard() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={6} style={{ color: THEME.subtext }}>
+                      <td className="px-5 py-6" colSpan={7} style={{ color: THEME.subtext }}>
                         Loading registrations…
                       </td>
                     </tr>
                   ) : (items || []).length === 0 ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={6} style={{ color: THEME.subtext }}>
+                      <td className="px-5 py-6" colSpan={7} style={{ color: THEME.subtext }}>
                         No registrations found.
                       </td>
                     </tr>
                   ) : (
                     (items || []).map((it, idx) => {
-                      const created =
-                        it?.created_at ||
-                        it?.createdAt ||
-                        it?.created ||
-                        it?.timestamp ||
-                        "";
+                      const created = it?.created_at || it?.createdAt || it?.created || it?.timestamp || "";
 
                       const createdLabel = created
                         ? (() => {
                             const d = new Date(created);
-                            return Number.isNaN(d.getTime())
-                              ? String(created)
-                              : d.toLocaleString();
+                            return Number.isNaN(d.getTime()) ? String(created) : d.toLocaleString();
                           })()
                         : "-";
 
@@ -367,10 +379,13 @@ export default function AdminDashboard() {
                             {it?.company || it?.organization || "-"}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            {it?.contact_name || it?.contact || it?.name || "-"}
+                            {contactLabel(it)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {it?.email || "-"}
+                          </td>
+                          <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                            {shirtSizesLabel(it)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             <span
