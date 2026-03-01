@@ -1,4 +1,4 @@
-// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v3 (No Card Storage + Paid Auditing)
+// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v4 PREMIUM (Filters + Search + Paid Auditing)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -32,6 +32,10 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+
+  // ✅ Premium controls
+  const [filterStatus, setFilterStatus] = useState("all"); // all | paid | pending (pending = NOT paid)
+  const [query, setQuery] = useState("");
 
   const token = useMemo(() => {
     try {
@@ -67,6 +71,7 @@ export default function AdminDashboard() {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() === "paid").length;
   }, [items]);
 
+  // ✅ Pending = NOT paid (Opción 1)
   const totalPendingCount = useMemo(() => {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
@@ -91,6 +96,9 @@ export default function AdminDashboard() {
       return sum + count;
     }, 0);
   }, [items]);
+
+  // ✅ Quick stats used in filters UI
+  const totalAllCount = (items || []).length;
 
   const fetchRegistrations = async ({ isRefresh = false } = {}) => {
     setError("");
@@ -185,6 +193,36 @@ export default function AdminDashboard() {
     return Number.isNaN(d.getTime()) ? String(created) : d.toLocaleString();
   };
 
+  // ✅ Search + filter logic (Premium)
+  const filteredItems = useMemo(() => {
+    const q = String(query || "").trim().toLowerCase();
+
+    return (items || [])
+      .filter((it) => {
+        const status = String(it?.status || "").toLowerCase();
+        if (filterStatus === "paid") return status === "paid";
+        if (filterStatus === "pending") return status !== "paid"; // ✅ option 1
+        return true; // all
+      })
+      .filter((it) => {
+        if (!q) return true;
+
+        const company = String(it?.company || it?.organization || "").toLowerCase();
+        const email = String(it?.email || "").toLowerCase();
+        const phone = String(it?.phone || it?.phone_number || "").toLowerCase();
+        const code = String(it?.confirmation_code || it?.confirmationCode || "").toLowerCase();
+        const players = String(playersLabel(it) || "").toLowerCase();
+
+        return (
+          company.includes(q) ||
+          email.includes(q) ||
+          phone.includes(q) ||
+          code.includes(q) ||
+          players.includes(q)
+        );
+      });
+  }, [items, filterStatus, query]);
+
   // ✅ Mark Paid: ENDPOINT REAL (Swagger)
   // PATCH /api/admin/registrations/{registration_id}/status
   // Body: { "status": "paid" }
@@ -203,7 +241,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // busyId debe trackear el mismo id que usamos para actualizar
     setBusyId(String(id));
     try {
       await tryMarkPaid(id);
@@ -227,6 +264,46 @@ export default function AdminDashboard() {
     } finally {
       setBusyId("");
     }
+  };
+
+  // ✅ Small helper for filter chips
+  const chipStyle = (active, tone = "neutral") => {
+    const base = {
+      height: "38px",
+      padding: "0 12px",
+      borderRadius: "12px",
+      border: `1px solid ${THEME.border2}`,
+      background: "rgba(255,255,255,0.03)",
+      color: "rgba(255,255,255,0.90)",
+      fontWeight: 700,
+      letterSpacing: "0.02em",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "8px",
+      transition: "transform 120ms ease, background 120ms ease, border-color 120ms ease",
+    };
+
+    if (!active) return base;
+
+    if (tone === "orange") {
+      return {
+        ...base,
+        background: "rgba(255,122,24,0.18)",
+        border: "1px solid rgba(255,122,24,0.35)",
+      };
+    }
+    if (tone === "green") {
+      return {
+        ...base,
+        background: "rgba(34,197,94,0.14)",
+        border: "1px solid rgba(34,197,94,0.30)",
+      };
+    }
+    return {
+      ...base,
+      background: "rgba(255,255,255,0.06)",
+      border: `1px solid ${THEME.border2}`,
+    };
   };
 
   return (
@@ -332,7 +409,7 @@ export default function AdminDashboard() {
                 Counts non-empty player names across all registrations
               </div>
               <div className="mt-3 text-xs" style={{ color: THEME.muted }}>
-                Registrations: {(items || []).length} · Paid: {totalPaidCount} · Pending: {totalPendingCount}
+                Registrations: {totalAllCount} · Paid: {totalPaidCount} · Pending: {totalPendingCount}
               </div>
             </div>
 
@@ -390,33 +467,108 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* ✅ Premium controls */}
           <div
-            className="mt-6 rounded-2xl border overflow-hidden"
+            className="mt-6 rounded-2xl border px-5 py-4 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between"
             style={{
               background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
               borderColor: THEME.border,
-              boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
+              boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
             }}
           >
-            <div className="p-5 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
                 <p className="text-sm" style={{ color: THEME.subtext }}>
                   Mark PAID after phone processing (no card data stored).
                 </p>
               </div>
+
               <div
                 className="text-xs font-semibold px-3 py-1.5 rounded-xl border"
                 style={{
                   background: "rgba(255,255,255,0.03)",
                   borderColor: THEME.border2,
                   color: "rgba(255,255,255,0.82)",
+                  height: "fit-content",
                 }}
               >
-                Items: {(items || []).length}
+                Showing: {filteredItems.length}
               </div>
             </div>
 
+            <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-end">
+              {/* Filter chips */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("all")}
+                  style={chipStyle(filterStatus === "all", "neutral")}
+                  title="Show all registrations"
+                >
+                  All <span style={{ color: THEME.muted }}>{totalAllCount}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("pending")}
+                  style={chipStyle(filterStatus === "pending", "orange")}
+                  title="Show pending (not paid)"
+                >
+                  Pending <span style={{ color: THEME.muted }}>{totalPendingCount}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("paid")}
+                  style={chipStyle(filterStatus === "paid", "green")}
+                  title="Show paid only"
+                >
+                  Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="flex items-center gap-2">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search: company, email, phone, code, players…"
+                  className="h-10 px-3 rounded-xl border text-sm outline-none"
+                  style={{
+                    width: "320px",
+                    maxWidth: "100%",
+                    background: "rgba(255,255,255,0.03)",
+                    borderColor: THEME.border2,
+                    color: "rgba(255,255,255,0.92)",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="h-10 px-3 rounded-xl border text-sm font-semibold"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    borderColor: THEME.border2,
+                    color: "rgba(255,255,255,0.85)",
+                  }}
+                  title="Clear search"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ✅ Table */}
+          <div
+            className="mt-4 rounded-2xl border overflow-hidden"
+            style={{
+              background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
+              borderColor: THEME.border,
+              boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
+            }}
+          >
             <div className="w-full overflow-x-auto">
               <table className="min-w-[1150px] w-full text-sm">
                 <thead>
@@ -461,14 +613,14 @@ export default function AdminDashboard() {
                         Loading registrations…
                       </td>
                     </tr>
-                  ) : (items || []).length === 0 ? (
+                  ) : filteredItems.length === 0 ? (
                     <tr>
                       <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
                         No registrations found.
                       </td>
                     </tr>
                   ) : (
-                    (items || []).map((it, idx) => {
+                    filteredItems.map((it, idx) => {
                       const status = String(it?.status || "pending").toLowerCase();
                       const isPaid = status === "paid";
                       const rowId = String(it?.id || it?._id || "");
