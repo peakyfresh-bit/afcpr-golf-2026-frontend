@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import axios from "axios";
 import { toast } from "sonner";
-import { Users, Building2, CreditCard, Mail, Phone, CheckCircle } from "lucide-react";
+import { Users, Building2, CreditCard, Mail, Phone, CheckCircle, User } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -23,6 +23,7 @@ const registrationSchema = z
     player4_name: z.string().optional(),
     player4_size: z.string().optional(),
     company: z.string().min(2, "Nombre de empresa es requerido"),
+    contact_name: z.string().min(2, "Nombre de contacto es requerido"),
     email: z.string().email("Email inválido"),
     phone: z.string().min(7, "Teléfono debe tener al menos 7 dígitos"),
     payment_method: z.enum(["cheque", "visa", "mastercard"]),
@@ -103,6 +104,7 @@ export default function RegistrationPage() {
       player4_name: "",
       player4_size: "",
       company: "",
+      contact_name: "",
       email: "",
       phone: "",
       payment_method: "cheque",
@@ -162,6 +164,7 @@ export default function RegistrationPage() {
       const payload = {
         players,
         company: data.company,
+        contact_name: data.contact_name,
         email: data.email,
         phone: data.phone,
         payment_method: data.payment_method,
@@ -179,8 +182,8 @@ export default function RegistrationPage() {
       const response = await axios.post(`${API}/registrations`, payload);
 
       navigate(`/success?code=${response.data.confirmation_code}`, {
-      state: { registration: response.data },
-  });
+        state: { registration: response.data },
+      });
     } catch (error) {
       const message = error.response?.data?.detail || "Error al procesar el registro";
       toast.error(message);
@@ -294,17 +297,19 @@ export default function RegistrationPage() {
 
               <div className="space-y-3">
                 <label className="block text-gray-400 text-sm font-medium">
-                  <Mail className="w-4 h-4 inline mr-1" />
-                  Email <span className="text-orange-500">*</span>
+                  <User className="w-4 h-4 inline mr-1" />
+                  Contact Name <span className="text-orange-500">*</span>
                 </label>
                 <input
-                  type="email"
-                  {...register("email")}
-                  placeholder="correo@empresa.com"
+                  type="text"
+                  {...register("contact_name")}
+                  placeholder="Nombre y apellido del contacto"
                   className="custom-input"
-                  data-testid="email-input"
+                  data-testid="contact-name-input"
                 />
-                {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
+                {errors.contact_name && (
+                  <p className="text-red-500 text-sm">{errors.contact_name.message}</p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -321,6 +326,23 @@ export default function RegistrationPage() {
                   data-testid="phone-input"
                 />
                 {errors.phone && <p className="text-red-500 text-sm">{errors.phone.message}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <div className="space-y-3 md:col-span-2">
+                <label className="block text-gray-400 text-sm font-medium">
+                  <Mail className="w-4 h-4 inline mr-1" />
+                  Email <span className="text-orange-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  {...register("email")}
+                  placeholder="correo@empresa.com"
+                  className="custom-input"
+                  data-testid="email-input"
+                />
+                {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
               </div>
             </div>
           </section>
