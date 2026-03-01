@@ -9,7 +9,8 @@ import { Users, Building2, CreditCard, Mail, Phone, CheckCircle, User } from "lu
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
+// ✅ XS removido (no hay camisas XS)
+const SHIRT_SIZES = ["S", "M", "L", "XL", "XXL"];
 const PRICE_PER_PLAYER = 275;
 
 const registrationSchema = z.object({
