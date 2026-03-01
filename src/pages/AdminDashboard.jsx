@@ -305,7 +305,7 @@ export default function AdminDashboard() {
     const paid = totalPaidCount;
     const pending = totalPendingCount;
     const total = paid + pending;
-    const pct = total ? (paid / total) : 0;
+    const pct = total ? paid / total : 0;
 
     const size = 82;
     const stroke = 10;
@@ -643,87 +643,92 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ✅ Premium toolbar */}
+          {/* ✅ Premium toolbar (FIXED: Showing + All + Pending + Paid inline) */}
           <div
-            className="mt-6 rounded-2xl border px-5 py-4 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between"
+            className="mt-6 rounded-2xl border px-5 py-4"
             style={{
               background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
               borderColor: THEME.border,
               boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
             }}
           >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
-                <p className="text-sm" style={{ color: THEME.subtext }}>
-                  Mark PAID after phone processing (no card data stored).
-                </p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              {/* Left: Title + subtitle */}
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
+                  <p className="text-sm" style={{ color: THEME.subtext }}>
+                    Mark PAID after phone processing (no card data stored).
+                  </p>
+                </div>
               </div>
 
-              <div
-                className="text-xs font-semibold px-3 py-1.5 rounded-xl border"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  borderColor: THEME.border2,
-                  color: "rgba(255,255,255,0.82)",
-                  height: "fit-content",
-                }}
-              >
-                Showing: {filteredItems.length}
-              </div>
-            </div>
+              {/* Right: Controls */}
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                {/* Row 1: Showing + Chips inline */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div
+                    className="text-xs font-semibold px-3 py-2 rounded-xl border"
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      borderColor: THEME.border2,
+                      color: "rgba(255,255,255,0.82)",
+                      lineHeight: 1,
+                    }}
+                    title="Number of rows currently shown (after filters + search)"
+                  >
+                    Showing: {filteredItems.length}
+                  </div>
 
-            <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-end">
-              {/* Filter chips */}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setFilterStatus("all")} style={chipStyle(filterStatus === "all")}>
-                  All <span style={{ color: THEME.muted }}>{totalAllCount}</span>
-                </button>
+                  <button type="button" onClick={() => setFilterStatus("all")} style={chipStyle(filterStatus === "all")}>
+                    All <span style={{ color: THEME.muted }}>{totalAllCount}</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setFilterStatus("pending")}
-                  style={chipStyle(filterStatus === "pending", "orange")}
-                >
-                  Pending <span style={{ color: THEME.muted }}>{totalPendingCount}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterStatus("pending")}
+                    style={chipStyle(filterStatus === "pending", "orange")}
+                  >
+                    Pending <span style={{ color: THEME.muted }}>{totalPendingCount}</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setFilterStatus("paid")}
-                  style={chipStyle(filterStatus === "paid", "green")}
-                >
-                  Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setFilterStatus("paid")}
+                    style={chipStyle(filterStatus === "paid", "green")}
+                  >
+                    Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
+                  </button>
+                </div>
 
-              {/* Search */}
-              <div className="flex items-center gap-2">
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search: company, email, phone, code, players…"
-                  className="h-10 px-3 rounded-xl border text-sm outline-none"
-                  style={{
-                    width: "340px",
-                    maxWidth: "100%",
-                    background: "rgba(255,255,255,0.03)",
-                    borderColor: THEME.border2,
-                    color: "rgba(255,255,255,0.92)",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  className="h-10 px-3 rounded-xl border text-sm font-semibold"
-                  style={{
-                    background: "rgba(255,255,255,0.03)",
-                    borderColor: THEME.border2,
-                    color: "rgba(255,255,255,0.85)",
-                  }}
-                >
-                  Clear
-                </button>
+                {/* Row 2: Search + Clear */}
+                <div className="flex items-center gap-2">
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search: company, email, phone, code, players…"
+                    className="h-10 px-3 rounded-xl border text-sm outline-none"
+                    style={{
+                      width: "340px",
+                      maxWidth: "100%",
+                      background: "rgba(255,255,255,0.03)",
+                      borderColor: THEME.border2,
+                      color: "rgba(255,255,255,0.92)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="h-10 px-3 rounded-xl border text-sm font-semibold"
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      borderColor: THEME.border2,
+                      color: "rgba(255,255,255,0.85)",
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
             </div>
           </div>
