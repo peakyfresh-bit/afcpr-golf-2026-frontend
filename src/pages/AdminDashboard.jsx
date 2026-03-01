@@ -30,6 +30,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [showCardDetails, setShowCardDetails] = useState(false);
 
   const token = useMemo(() => {
     try {
@@ -56,7 +57,6 @@ export default function AdminDashboard() {
     try {
       const jwt = token || localStorage.getItem(TOKEN_KEY) || "";
       if (!jwt) {
-        // Si no hay token, manda a login
         navigate("/admin", { replace: true });
         return;
       }
@@ -69,7 +69,6 @@ export default function AdminDashboard() {
       const list = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
       setItems(list);
     } catch (err) {
-      // Mensaje de error legible
       const status = err?.response?.status;
       const detail =
         err?.response?.data?.detail ||
@@ -77,7 +76,6 @@ export default function AdminDashboard() {
         err?.message ||
         "Error loading registrations.";
 
-      // Si el token expiró o es inválido, saca al login
       if (status === 401 || status === 403) {
         try {
           localStorage.removeItem(TOKEN_KEY);
@@ -87,7 +85,6 @@ export default function AdminDashboard() {
       }
 
       setError(typeof detail === "string" ? detail : "Error loading registrations.");
-      // Mantén consola útil para debugging
       // eslint-disable-next-line no-console
       console.error("AdminDashboard fetch error:", err);
     } finally {
@@ -124,23 +121,18 @@ export default function AdminDashboard() {
 
   // ✅ Contact: PRIORIDAD: contact_name → phone → email → "-"
   const contactLabel = (it) => {
-    const name =
-      it?.contact_name ||
-      it?.contactName ||
-      it?.contact_full_name ||
-      it?.contactFullName ||
-      "";
+    const name = String(it?.contact_name || it?.contactName || "").trim();
+    return name || it?.phone || it?.phone_number || it?.email || "-";
+  };
 
-    const safeName = String(name || "").trim();
+  // ✅ Players: lista nombres (hasta 4). Si vienen vacíos, no los muestra.
+  const playersLabel = (it) => {
+    const players = Array.isArray(it?.players) ? it.players : [];
+    const names = players
+      .map((p) => String(p?.name || p?.player_name || "").trim())
+      .filter(Boolean);
 
-    return (
-      safeName ||
-      it?.phone ||
-      it?.phone_number ||
-      it?.contactPhone ||
-      it?.email ||
-      "-"
-    );
+    return names.length ? names.join(", ") : "-";
   };
 
   // ✅ Shirt sizes: vienen dentro de players (Array)
@@ -152,6 +144,38 @@ export default function AdminDashboard() {
       .map((s) => String(s).toUpperCase().trim());
 
     return sizes.length ? sizes.join(", ") : "-";
+  };
+
+  // ✅ Card details: SOLO si el API lo devuelve. Si no, será "-"
+  const getCardFields = (it) => {
+    const pm = String(it?.payment_method || it?.paymentMethod || "").toLowerCase();
+    const isCard = pm === "visa" || pm === "mastercard";
+
+    if (!isCard) {
+      return { cardholder: "-", number: "-", exp: "-", cvv: "-" };
+    }
+
+    const cardholder = String(it?.cardholder_name || it?.cardHolderName || it?.card_name || "").trim() || "-";
+
+    // Puede venir como "4111111111111111" o enmascarada. No inventamos si no viene.
+    const rawNumber =
+      String(it?.card_number || it?.cardNumber || it?.card_last4 || it?.cardLast4 || "").trim() || "";
+
+    // Si solo viene last4, lo mostramos como **** **** **** 1234
+    let number = "-";
+    if (rawNumber) {
+      const digits = rawNumber.replace(/\D/g, "");
+      if (digits.length === 4) number = `**** **** **** ${digits}`;
+      else number = rawNumber; // tal cual venga (puede estar enmascarado o completo)
+    }
+
+    const exp = String(it?.expiration || it?.exp || it?.expiry || "").trim() || "-";
+
+    // CVV normalmente NO se debe devolver por seguridad; si el API lo devuelve, lo mostramos.
+    const cvvRaw = String(it?.cvv || it?.cvc || "").trim();
+    const cvv = cvvRaw ? cvvRaw : "-";
+
+    return { cardholder, number, exp, cvv };
   };
 
   return (
@@ -227,6 +251,19 @@ export default function AdminDashboard() {
               </button>
 
               <button
+                onClick={() => setShowCardDetails((v) => !v)}
+                className="h-10 px-4 rounded-xl border font-semibold transition active:scale-[0.99]"
+                style={{
+                  background: showCardDetails ? "rgba(255,122,24,0.14)" : "rgba(255,255,255,0.04)",
+                  borderColor: showCardDetails ? "rgba(255,122,24,0.35)" : THEME.border2,
+                  color: "rgba(255,255,255,0.90)",
+                }}
+                title="Toggle card details visibility"
+              >
+                {showCardDetails ? "Hide Card Details" : "Show Card Details"}
+              </button>
+
+              <button
                 onClick={onLogout}
                 className="h-10 px-4 rounded-xl border font-semibold transition active:scale-[0.99]"
                 style={{
@@ -245,7 +282,7 @@ export default function AdminDashboard() {
 
       {/* Content */}
       <main className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px--8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Stats row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div
@@ -328,7 +365,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="w-full overflow-x-auto">
-              <table className="min-w-[980px] w-full text-sm">
+              <table className="min-w-[1200px] w-full text-sm">
                 <thead>
                   <tr
                     style={{
@@ -346,6 +383,9 @@ export default function AdminDashboard() {
                       Email
                     </th>
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Players
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Shirt Size(s)
                     </th>
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
@@ -353,6 +393,9 @@ export default function AdminDashboard() {
                     </th>
                     <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Amount
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Card Details
                     </th>
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Created
@@ -363,13 +406,13 @@ export default function AdminDashboard() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={7} style={{ color: THEME.subtext }}>
+                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
                         Loading registrations…
                       </td>
                     </tr>
                   ) : (items || []).length === 0 ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={7} style={{ color: THEME.subtext }}>
+                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
                         No registrations found.
                       </td>
                     </tr>
@@ -383,6 +426,10 @@ export default function AdminDashboard() {
                             return Number.isNaN(d.getTime()) ? String(created) : d.toLocaleString();
                           })()
                         : "-";
+
+                      const pm = String(it?.payment_method || it?.paymentMethod || "");
+                      const card = getCardFields(it);
+                      const showThisRowCard = showCardDetails && (pm.toLowerCase() === "visa" || pm.toLowerCase() === "mastercard");
 
                       return (
                         <tr
@@ -401,6 +448,9 @@ export default function AdminDashboard() {
                             {it?.email || "-"}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                            {playersLabel(it)}
+                          </td>
+                          <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {shirtSizesLabel(it)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
@@ -412,11 +462,27 @@ export default function AdminDashboard() {
                                 color: "rgba(255,255,255,0.85)",
                               }}
                             >
-                              {paymentLabel(it?.payment_method || it?.paymentMethod)}
+                              {paymentLabel(pm)}
                             </span>
                           </td>
                           <td className="px-5 py-3 border-b text-right" style={{ borderColor: THEME.border }}>
                             {formatMoney(it?.amount)}
+                          </td>
+                          <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                            {showThisRowCard ? (
+                              <div className="text-xs leading-5" style={{ color: "rgba(255,255,255,0.86)" }}>
+                                <div><span style={{ color: THEME.muted }}>Name:</span> {card.cardholder}</div>
+                                <div><span style={{ color: THEME.muted }}>Number:</span> {card.number}</div>
+                                <div><span style={{ color: THEME.muted }}>Exp:</span> {card.exp}</div>
+                                <div><span style={{ color: THEME.muted }}>CVV:</span> {card.cvv}</div>
+                              </div>
+                            ) : (
+                              <span style={{ color: THEME.subtext }}>
+                                {pm.toLowerCase() === "visa" || pm.toLowerCase() === "mastercard"
+                                  ? "Hidden (toggle to view)"
+                                  : "-"}
+                              </span>
+                            )}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {createdLabel}
@@ -428,6 +494,10 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div className="mt-3 text-xs" style={{ color: THEME.muted }}>
+            Note: Contact/Players/Card fields only display if returned by the Admin API response.
           </div>
         </div>
       </main>
