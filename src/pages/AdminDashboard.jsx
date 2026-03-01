@@ -80,6 +80,18 @@ export default function AdminDashboard() {
     }, 0);
   }, [items]);
 
+  // ✅ Total Players PAID: cuenta jugadores solo de registros paid
+  const totalPlayersPaid = useMemo(() => {
+    return (items || []).reduce((sum, it) => {
+      const status = String(it?.status || "").toLowerCase();
+      if (status !== "paid") return sum;
+
+      const players = Array.isArray(it?.players) ? it.players : [];
+      const count = players.filter((p) => String(p?.name || "").trim().length > 0).length;
+      return sum + count;
+    }, 0);
+  }, [items]);
+
   const fetchRegistrations = async ({ isRefresh = false } = {}) => {
     setError("");
     if (isRefresh) setRefreshing(true);
@@ -191,6 +203,7 @@ export default function AdminDashboard() {
       return;
     }
 
+    // busyId debe trackear el mismo id que usamos para actualizar
     setBusyId(String(id));
     try {
       await tryMarkPaid(id);
@@ -198,7 +211,7 @@ export default function AdminDashboard() {
       // Update UI optimista: marcar paid localmente
       setItems((prev) =>
         (prev || []).map((x) => {
-          const xid = x?._id || x?.id;
+          const xid = x?.id || x?._id;
           if (String(xid) !== String(id)) return x;
           return { ...x, status: "paid" };
         })
@@ -301,18 +314,10 @@ export default function AdminDashboard() {
 
       <main className="flex-1 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* ✅ Cards row: exactly 4 cards in one row (md) */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Total Players Registered */}
             <div
-              className="rounded-2xl border p-5"
-              style={{
-                background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
-                borderColor: THEME.border,
-              }}
-            >
-              <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
-                Total Registrations
-              </div>
-                          <div
               className="rounded-2xl border p-5"
               style={{
                 background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
@@ -326,13 +331,29 @@ export default function AdminDashboard() {
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
                 Counts non-empty player names across all registrations
               </div>
-            </div>
-              <div className="mt-2 text-3xl font-semibold">{(items || []).length}</div>
-              <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
-                Paid: {totalPaidCount} · Pending: {totalPendingCount}
+              <div className="mt-3 text-xs" style={{ color: THEME.muted }}>
+                Registrations: {(items || []).length} · Paid: {totalPaidCount} · Pending: {totalPendingCount}
               </div>
             </div>
 
+            {/* Total Players Paid */}
+            <div
+              className="rounded-2xl border p-5"
+              style={{
+                background: `linear-gradient(180deg, rgba(34,197,94,0.10), ${THEME.panel})`,
+                borderColor: "rgba(34,197,94,0.25)",
+              }}
+            >
+              <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
+                Total Players Paid
+              </div>
+              <div className="mt-2 text-3xl font-semibold">{totalPlayersPaid}</div>
+              <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
+                Counts only players from PAID registrations
+              </div>
+            </div>
+
+            {/* Total Amount Paid */}
             <div
               className="rounded-2xl border p-5"
               style={{
@@ -349,6 +370,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Status */}
             <div
               className="rounded-2xl border p-5"
               style={{
@@ -414,7 +436,10 @@ export default function AdminDashboard() {
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Payment
                     </th>
-                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th
+                      className="text-right font-semibold px-5 py-3 border-b"
+                      style={{ borderColor: THEME.border }}
+                    >
                       Amount
                     </th>
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
@@ -446,7 +471,7 @@ export default function AdminDashboard() {
                     (items || []).map((it, idx) => {
                       const status = String(it?.status || "pending").toLowerCase();
                       const isPaid = status === "paid";
-                      const rowId = String(it?._id || it?.id || "");
+                      const rowId = String(it?.id || it?._id || "");
 
                       return (
                         <tr
