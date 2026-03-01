@@ -1,4 +1,4 @@
-// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v4 PREMIUM (Filters + Search + Paid Auditing)
+// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v5 PREMIUM+ (Filters + Search + Charts + CSV Export)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -36,6 +36,7 @@ export default function AdminDashboard() {
   // ✅ Premium controls
   const [filterStatus, setFilterStatus] = useState("all"); // all | paid | pending (pending = NOT paid)
   const [query, setQuery] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const token = useMemo(() => {
     try {
@@ -76,6 +77,8 @@ export default function AdminDashboard() {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
 
+  const totalAllCount = (items || []).length;
+
   // ✅ Total Players Registered: cuenta nombres no vacíos en todos los registros
   const totalPlayersRegistered = useMemo(() => {
     return (items || []).reduce((sum, it) => {
@@ -97,8 +100,12 @@ export default function AdminDashboard() {
     }, 0);
   }, [items]);
 
-  // ✅ Quick stats used in filters UI
-  const totalAllCount = (items || []).length;
+  // ✅ Progress for players
+  const playersPaidPct = useMemo(() => {
+    if (!totalPlayersRegistered) return 0;
+    const pct = (totalPlayersPaid / totalPlayersRegistered) * 100;
+    return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+  }, [totalPlayersPaid, totalPlayersRegistered]);
 
   const fetchRegistrations = async ({ isRefresh = false } = {}) => {
     setError("");
@@ -119,6 +126,7 @@ export default function AdminDashboard() {
       const data = res?.data;
       const list = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
       setItems(list);
+      setLastUpdated(new Date());
     } catch (err) {
       const status = err?.response?.status;
       const detail =
@@ -223,9 +231,7 @@ export default function AdminDashboard() {
       });
   }, [items, filterStatus, query]);
 
-  // ✅ Mark Paid: ENDPOINT REAL (Swagger)
-  // PATCH /api/admin/registrations/{registration_id}/status
-  // Body: { "status": "paid" }
+  // ✅ Mark Paid
   const tryMarkPaid = async (id) => {
     return axios.patch(
       `${API}/admin/registrations/${id}/status`,
@@ -245,7 +251,7 @@ export default function AdminDashboard() {
     try {
       await tryMarkPaid(id);
 
-      // Update UI optimista: marcar paid localmente
+      // Update UI optimista
       setItems((prev) =>
         (prev || []).map((x) => {
           const xid = x?.id || x?._id;
@@ -266,7 +272,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ Small helper for filter chips
+  // ✅ Chip styles (premium)
   const chipStyle = (active, tone = "neutral") => {
     const base = {
       height: "38px",
@@ -275,7 +281,7 @@ export default function AdminDashboard() {
       border: `1px solid ${THEME.border2}`,
       background: "rgba(255,255,255,0.03)",
       color: "rgba(255,255,255,0.90)",
-      fontWeight: 700,
+      fontWeight: 800,
       letterSpacing: "0.02em",
       display: "inline-flex",
       alignItems: "center",
@@ -286,25 +292,116 @@ export default function AdminDashboard() {
     if (!active) return base;
 
     if (tone === "orange") {
-      return {
-        ...base,
-        background: "rgba(255,122,24,0.18)",
-        border: "1px solid rgba(255,122,24,0.35)",
-      };
+      return { ...base, background: "rgba(255,122,24,0.18)", border: "1px solid rgba(255,122,24,0.35)" };
     }
     if (tone === "green") {
-      return {
-        ...base,
-        background: "rgba(34,197,94,0.14)",
-        border: "1px solid rgba(34,197,94,0.30)",
-      };
+      return { ...base, background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.30)" };
     }
-    return {
-      ...base,
-      background: "rgba(255,255,255,0.06)",
-      border: `1px solid ${THEME.border2}`,
-    };
+    return { ...base, background: "rgba(255,255,255,0.06)", border: `1px solid ${THEME.border2}` };
   };
+
+  // ✅ Donut chart helpers (Paid vs Pending registrations)
+  const donut = useMemo(() => {
+    const paid = totalPaidCount;
+    const pending = totalPendingCount;
+    const total = paid + pending;
+    const pct = total ? (paid / total) : 0;
+
+    const size = 82;
+    const stroke = 10;
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const dash = pct * c;
+
+    return { paid, pending, total, pct, size, stroke, r, c, dash };
+  }, [totalPaidCount, totalPendingCount]);
+
+  // ✅ CSV Export (frontend-only) using filteredItems
+  const exportCsv = () => {
+    try {
+      const headers = [
+        "id",
+        "company",
+        "contact",
+        "email",
+        "phone",
+        "payment_method",
+        "amount",
+        "status",
+        "confirmation_code",
+        "created_at",
+        "players",
+      ];
+
+      const escape = (v) => {
+        const s = String(v ?? "");
+        const cleaned = s.replace(/\r?\n|\r/g, " ").trim();
+        if (/[",]/.test(cleaned)) return `"${cleaned.replace(/"/g, '""')}"`;
+        return cleaned;
+      };
+
+      const rows = filteredItems.map((it) => {
+        const id = it?.id || it?._id || "";
+        const company = it?.company || it?.organization || "";
+        const contact = contactLabel(it);
+        const email = it?.email || "";
+        const phone = it?.phone || it?.phone_number || "";
+        const payment = it?.payment_method || it?.paymentMethod || "";
+        const amount = it?.amount ?? "";
+        const status = it?.status ?? "";
+        const code = it?.confirmation_code || it?.confirmationCode || "";
+        const created = it?.created_at || it?.createdAt || it?.created || it?.timestamp || "";
+        const players = playersLabel(it);
+
+        return [
+          escape(id),
+          escape(company),
+          escape(contact),
+          escape(email),
+          escape(phone),
+          escape(payment),
+          escape(amount),
+          escape(status),
+          escape(code),
+          escape(created),
+          escape(players),
+        ].join(",");
+      });
+
+      const csv = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(
+        2,
+        "0"
+      )}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `afcpr_registrations_${filterStatus}_${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("CSV exported");
+    } catch (e) {
+      toast.error("CSV export failed");
+      // eslint-disable-next-line no-console
+      console.error("CSV export failed:", e);
+    }
+  };
+
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdated) return "—";
+    try {
+      return lastUpdated.toLocaleString();
+    } catch {
+      return String(lastUpdated);
+    }
+  }, [lastUpdated]);
 
   return (
     <div
@@ -357,6 +454,9 @@ export default function AdminDashboard() {
                 <p className="text-sm mt-1" style={{ color: THEME.subtext }}>
                   Admin Dashboard — Registrations Overview
                 </p>
+                <p className="text-xs mt-2" style={{ color: THEME.muted }}>
+                  Last updated: {lastUpdatedLabel}
+                </p>
               </div>
             </div>
 
@@ -391,7 +491,7 @@ export default function AdminDashboard() {
 
       <main className="flex-1 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* ✅ Cards row: exactly 4 cards in one row (md) */}
+          {/* ✅ Cards row */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Total Players Registered */}
             <div
@@ -405,9 +505,27 @@ export default function AdminDashboard() {
                 Total Players Registered
               </div>
               <div className="mt-2 text-3xl font-semibold">{totalPlayersRegistered}</div>
-              <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
-                Counts non-empty player names across all registrations
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-xs" style={{ color: THEME.subtext }}>
+                  <span>Players Paid</span>
+                  <span>
+                    {totalPlayersPaid} / {totalPlayersRegistered} ({playersPaidPct.toFixed(0)}%)
+                  </span>
+                </div>
+                <div
+                  className="mt-2 h-2.5 rounded-full border overflow-hidden"
+                  style={{ borderColor: THEME.border2, background: "rgba(255,255,255,0.03)" }}
+                >
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${playersPaidPct}%`,
+                      background: `linear-gradient(90deg, ${THEME.ok}, rgba(34,197,94,0.55))`,
+                    }}
+                  />
+                </div>
               </div>
+
               <div className="mt-3 text-xs" style={{ color: THEME.muted }}>
                 Registrations: {totalAllCount} · Paid: {totalPaidCount} · Pending: {totalPendingCount}
               </div>
@@ -428,6 +546,44 @@ export default function AdminDashboard() {
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
                 Counts only players from PAID registrations
               </div>
+              <div className="mt-4 flex items-center gap-3">
+                <svg width={donut.size} height={donut.size} viewBox={`0 0 ${donut.size} ${donut.size}`}>
+                  <circle
+                    cx={donut.size / 2}
+                    cy={donut.size / 2}
+                    r={donut.r}
+                    fill="transparent"
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth={donut.stroke}
+                  />
+                  <circle
+                    cx={donut.size / 2}
+                    cy={donut.size / 2}
+                    r={donut.r}
+                    fill="transparent"
+                    stroke="rgba(34,197,94,0.95)"
+                    strokeWidth={donut.stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={`${donut.dash} ${donut.c - donut.dash}`}
+                    transform={`rotate(-90 ${donut.size / 2} ${donut.size / 2})`}
+                  />
+                </svg>
+
+                <div className="text-sm">
+                  <div className="font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
+                    Paid vs Pending
+                  </div>
+                  <div className="mt-1" style={{ color: THEME.subtext }}>
+                    Paid: <span style={{ color: "rgba(255,255,255,0.92)", fontWeight: 700 }}>{donut.paid}</span>
+                  </div>
+                  <div style={{ color: THEME.subtext }}>
+                    Pending: <span style={{ color: "rgba(255,255,255,0.92)", fontWeight: 700 }}>{donut.pending}</span>
+                  </div>
+                  <div className="mt-1 text-xs" style={{ color: THEME.muted }}>
+                    Paid rate: {(donut.pct * 100).toFixed(0)}%
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Total Amount Paid */}
@@ -444,6 +600,26 @@ export default function AdminDashboard() {
               <div className="mt-2 text-3xl font-semibold">{formatMoney(totalPaidAmount)}</div>
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
                 Audit total sums only PAID registrations
+              </div>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={exportCsv}
+                  className="h-10 px-4 rounded-xl border text-sm font-semibold transition active:scale-[0.99]"
+                  style={{
+                    background: "rgba(255,122,24,0.14)",
+                    borderColor: "rgba(255,122,24,0.30)",
+                    color: "rgba(255,255,255,0.95)",
+                    width: "100%",
+                  }}
+                  title="Export the current view (filters + search) to CSV"
+                >
+                  Export CSV (Current View)
+                </button>
+                <div className="mt-2 text-xs" style={{ color: THEME.muted }}>
+                  Exports what you see: {filterStatus.toUpperCase()} + Search
+                </div>
               </div>
             </div>
 
@@ -467,7 +643,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ✅ Premium controls */}
+          {/* ✅ Premium toolbar */}
           <div
             className="mt-6 rounded-2xl border px-5 py-4 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between"
             style={{
@@ -500,12 +676,7 @@ export default function AdminDashboard() {
             <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-end">
               {/* Filter chips */}
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFilterStatus("all")}
-                  style={chipStyle(filterStatus === "all", "neutral")}
-                  title="Show all registrations"
-                >
+                <button type="button" onClick={() => setFilterStatus("all")} style={chipStyle(filterStatus === "all")}>
                   All <span style={{ color: THEME.muted }}>{totalAllCount}</span>
                 </button>
 
@@ -513,7 +684,6 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => setFilterStatus("pending")}
                   style={chipStyle(filterStatus === "pending", "orange")}
-                  title="Show pending (not paid)"
                 >
                   Pending <span style={{ color: THEME.muted }}>{totalPendingCount}</span>
                 </button>
@@ -522,7 +692,6 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => setFilterStatus("paid")}
                   style={chipStyle(filterStatus === "paid", "green")}
-                  title="Show paid only"
                 >
                   Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
                 </button>
@@ -536,7 +705,7 @@ export default function AdminDashboard() {
                   placeholder="Search: company, email, phone, code, players…"
                   className="h-10 px-3 rounded-xl border text-sm outline-none"
                   style={{
-                    width: "320px",
+                    width: "340px",
                     maxWidth: "100%",
                     background: "rgba(255,255,255,0.03)",
                     borderColor: THEME.border2,
@@ -552,7 +721,6 @@ export default function AdminDashboard() {
                     borderColor: THEME.border2,
                     color: "rgba(255,255,255,0.85)",
                   }}
-                  title="Clear search"
                 >
                   Clear
                 </button>
