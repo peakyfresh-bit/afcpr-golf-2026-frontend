@@ -71,6 +71,15 @@ export default function AdminDashboard() {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
 
+  // ✅ Total Players Registered: cuenta nombres no vacíos en todos los registros
+  const totalPlayersRegistered = useMemo(() => {
+    return (items || []).reduce((sum, it) => {
+      const players = Array.isArray(it?.players) ? it.players : [];
+      const count = players.filter((p) => String(p?.name || "").trim().length > 0).length;
+      return sum + count;
+    }, 0);
+  }, [items]);
+
   const fetchRegistrations = async ({ isRefresh = false } = {}) => {
     setError("");
     if (isRefresh) setRefreshing(true);
@@ -292,7 +301,7 @@ export default function AdminDashboard() {
 
       <main className="flex-1 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div
               className="rounded-2xl border p-5"
               style={{
@@ -303,6 +312,21 @@ export default function AdminDashboard() {
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
                 Total Registrations
               </div>
+                          <div
+              className="rounded-2xl border p-5"
+              style={{
+                background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
+                borderColor: THEME.border,
+              }}
+            >
+              <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
+                Total Players Registered
+              </div>
+              <div className="mt-2 text-3xl font-semibold">{totalPlayersRegistered}</div>
+              <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
+                Counts non-empty player names across all registrations
+              </div>
+            </div>
               <div className="mt-2 text-3xl font-semibold">{(items || []).length}</div>
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
                 Paid: {totalPaidCount} · Pending: {totalPendingCount}
