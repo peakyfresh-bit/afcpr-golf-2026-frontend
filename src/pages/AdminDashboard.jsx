@@ -63,6 +63,10 @@ export default function AdminDashboard() {
     }, 0);
   }, [items]);
 
+  const totalPaidCount = useMemo(() => {
+    return (items || []).filter((it) => String(it?.status || "").toLowerCase() === "paid").length;
+  }, [items]);
+
   const totalPendingCount = useMemo(() => {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
@@ -137,7 +141,7 @@ export default function AdminDashboard() {
     return name || it?.phone || it?.phone_number || it?.email || "-";
   };
 
-  // ✅ Players: Nombre (Talla)
+  // ✅ Players: Nombre (Talla) — evita "()" cuando talla está vacía
   const playersLabel = (it) => {
     const players = Array.isArray(it?.players) ? it.players : [];
     const list = players
@@ -145,7 +149,8 @@ export default function AdminDashboard() {
         const name = String(p?.name || "").trim();
         const size = String(p?.shirt_size || "").trim();
         if (!name) return "";
-        return size ? `${name} (${size.toUpperCase()})` : name;
+        const cleanSize = size ? size.toUpperCase() : "";
+        return cleanSize ? `${name} (${cleanSize})` : name;
       })
       .filter(Boolean);
 
@@ -159,37 +164,19 @@ export default function AdminDashboard() {
     return Number.isNaN(d.getTime()) ? String(created) : d.toLocaleString();
   };
 
-  // ✅ Mark Paid: intentamos varias rutas típicas (sin tocar backend)
+  // ✅ Mark Paid: ENDPOINT REAL (Swagger)
+  // PATCH /api/admin/registrations/{registration_id}/status
+  // Body: { "status": "paid" }
   const tryMarkPaid = async (id) => {
-    const candidates = [
-      { method: "patch", url: `${API}/admin/registrations/${id}/status`, data: { status: "paid" } },
-      { method: "put", url: `${API}/admin/registrations/${id}/status`, data: { status: "paid" } },
-      { method: "post", url: `${API}/admin/registrations/${id}/status`, data: { status: "paid" } },
-      { method: "patch", url: `${API}/admin/registrations/${id}`, data: { status: "paid" } },
-      { method: "put", url: `${API}/admin/registrations/${id}`, data: { status: "paid" } },
-    ];
-
-    let lastErr = null;
-
-    for (const c of candidates) {
-      try {
-        const res = await axios[c.method](c.url, c.data, { headers: authHeader() });
-        return res;
-      } catch (e) {
-        lastErr = e;
-        // si es 404 seguimos intentando; si es 405 también
-        const st = e?.response?.status;
-        if (st === 404 || st === 405) continue;
-        // otros errores (400/401/403/500) paramos
-        throw e;
-      }
-    }
-
-    throw lastErr || new Error("No status endpoint matched");
+    return axios.patch(
+      `${API}/admin/registrations/${id}/status`,
+      { status: "paid" },
+      { headers: authHeader() }
+    );
   };
 
   const markPaid = async (it) => {
-    const id = it?._id || it?.id;
+    const id = it?.id || it?._id;
     if (!id) {
       toast.error("Missing registration id");
       return;
@@ -306,17 +293,29 @@ export default function AdminDashboard() {
       <main className="flex-1 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border p-5" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border }}>
+            <div
+              className="rounded-2xl border p-5"
+              style={{
+                background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
+                borderColor: THEME.border,
+              }}
+            >
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
                 Total Registrations
               </div>
               <div className="mt-2 text-3xl font-semibold">{(items || []).length}</div>
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
-                Paid: {(items || []).filter((it) => String(it?.status || "").toLowerCase() === "paid").length} · Pending: {totalPendingCount}
+                Paid: {totalPaidCount} · Pending: {totalPendingCount}
               </div>
             </div>
 
-            <div className="rounded-2xl border p-5" style={{ background: `linear-gradient(180deg, rgba(255,122,24,0.10), ${THEME.panel})`, borderColor: "rgba(255,122,24,0.25)" }}>
+            <div
+              className="rounded-2xl border p-5"
+              style={{
+                background: `linear-gradient(180deg, rgba(255,122,24,0.10), ${THEME.panel})`,
+                borderColor: "rgba(255,122,24,0.25)",
+              }}
+            >
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
                 Total Amount (Paid)
               </div>
@@ -326,18 +325,33 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="rounded-2xl border p-5" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border }}>
+            <div
+              className="rounded-2xl border p-5"
+              style={{
+                background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
+                borderColor: THEME.border,
+              }}
+            >
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
                 Status
               </div>
-              <div className="mt-2 text-lg font-semibold">{loading ? "Loading..." : error ? "Attention needed" : "Connected"}</div>
+              <div className="mt-2 text-lg font-semibold">
+                {loading ? "Loading..." : error ? "Attention needed" : "Connected"}
+              </div>
               <div className="mt-1 text-sm" style={{ color: error ? THEME.danger : THEME.subtext }}>
                 {error ? error : "Admin endpoint responding normally"}
               </div>
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border overflow-hidden" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border, boxShadow: "0 18px 50px rgba(0,0,0,0.28)" }}>
+          <div
+            className="mt-6 rounded-2xl border overflow-hidden"
+            style={{
+              background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
+              borderColor: THEME.border,
+              boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
+            }}
+          >
             <div className="p-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
@@ -345,7 +359,14 @@ export default function AdminDashboard() {
                   Mark PAID after phone processing (no card data stored).
                 </p>
               </div>
-              <div className="text-xs font-semibold px-3 py-1.5 rounded-xl border" style={{ background: "rgba(255,255,255,0.03)", borderColor: THEME.border2, color: "rgba(255,255,255,0.82)" }}>
+              <div
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl border"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  borderColor: THEME.border2,
+                  color: "rgba(255,255,255,0.82)",
+                }}
+              >
                 Items: {(items || []).length}
               </div>
             </div>
@@ -354,34 +375,62 @@ export default function AdminDashboard() {
               <table className="min-w-[1150px] w-full text-sm">
                 <thead>
                   <tr style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.78)" }}>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Company</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Contact</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Email</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Players</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Payment</th>
-                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Amount</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Status</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Created</th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Actions</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Company
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Contact
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Email
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Players
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Payment
+                    </th>
+                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Amount
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Status
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Created
+                    </th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>Loading registrations…</td>
+                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
+                        Loading registrations…
+                      </td>
                     </tr>
                   ) : (items || []).length === 0 ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>No registrations found.</td>
+                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
+                        No registrations found.
+                      </td>
                     </tr>
                   ) : (
                     (items || []).map((it, idx) => {
                       const status = String(it?.status || "pending").toLowerCase();
                       const isPaid = status === "paid";
+                      const rowId = String(it?._id || it?.id || "");
 
                       return (
-                        <tr key={it?._id || it?.id || idx} style={{ background: idx % 2 === 0 ? "rgba(255,255,255,0.00)" : "rgba(255,255,255,0.02)" }}>
+                        <tr
+                          key={rowId || idx}
+                          style={{
+                            background: idx % 2 === 0 ? "rgba(255,255,255,0.00)" : "rgba(255,255,255,0.02)",
+                          }}
+                        >
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {it?.company || it?.organization || "-"}
                           </td>
@@ -395,7 +444,14 @@ export default function AdminDashboard() {
                             {playersLabel(it)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-semibold" style={{ background: "rgba(255,122,24,0.08)", borderColor: "rgba(255,122,24,0.22)", color: "rgba(255,255,255,0.85)" }}>
+                            <span
+                              className="inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-semibold"
+                              style={{
+                                background: "rgba(255,122,24,0.08)",
+                                borderColor: "rgba(255,122,24,0.22)",
+                                color: "rgba(255,255,255,0.85)",
+                              }}
+                            >
                               {paymentLabel(it?.payment_method || it?.paymentMethod)}
                             </span>
                           </td>
@@ -420,18 +476,18 @@ export default function AdminDashboard() {
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             <button
                               onClick={() => markPaid(it)}
-                              disabled={isPaid || busyId === String(it?._id || it?.id)}
+                              disabled={isPaid || busyId === rowId}
                               className="h-9 px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
                               style={{
                                 background: isPaid ? "rgba(255,255,255,0.03)" : "rgba(255,122,24,0.14)",
                                 borderColor: isPaid ? THEME.border2 : "rgba(255,122,24,0.35)",
                                 color: "rgba(255,255,255,0.95)",
-                                opacity: isPaid || busyId === String(it?._id || it?.id) ? 0.65 : 1,
+                                opacity: isPaid || busyId === rowId ? 0.65 : 1,
                                 cursor: isPaid ? "not-allowed" : "pointer",
                               }}
                               title={isPaid ? "Already paid" : "Mark as paid after phone processing"}
                             >
-                              {isPaid ? "Paid" : busyId === String(it?._id || it?.id) ? "Updating..." : "Mark Paid"}
+                              {isPaid ? "Paid" : busyId === rowId ? "Updating..." : "Mark Paid"}
                             </button>
                           </td>
                         </tr>
@@ -447,7 +503,14 @@ export default function AdminDashboard() {
 
       <footer className="w-full mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-          <div className="rounded-2xl border px-5 py-4 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border, color: THEME.subtext }}>
+          <div
+            className="rounded-2xl border px-5 py-4 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"
+            style={{
+              background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
+              borderColor: THEME.border,
+              color: THEME.subtext,
+            }}
+          >
             <div className="font-medium" style={{ color: "rgba(255,255,255,0.78)" }}>
               © AFCPR Golf Tournament 2026 — Admin Access
             </div>
