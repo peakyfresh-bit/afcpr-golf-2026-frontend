@@ -12,74 +12,22 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 const PRICE_PER_PLAYER = 275;
 
-const registrationSchema = z
-  .object({
-    player1_name: z.string().min(2, "Nombre del jugador 1 es requerido"),
-    player1_size: z.string().min(1, "Seleccione talla"),
-    player2_name: z.string().optional(),
-    player2_size: z.string().optional(),
-    player3_name: z.string().optional(),
-    player3_size: z.string().optional(),
-    player4_name: z.string().optional(),
-    player4_size: z.string().optional(),
-    company: z.string().min(2, "Nombre de empresa es requerido"),
-    contact_name: z.string().min(2, "Nombre de contacto es requerido"),
-    email: z.string().email("Email inválido"),
-    phone: z.string().min(7, "Teléfono debe tener al menos 7 dígitos"),
-    payment_method: z.enum(["cheque", "visa", "mastercard"]),
-    cardholder_name: z.string().optional(),
-    card_number: z.string().optional(),
-    expiration: z.string().optional(),
-    cvv: z.string().optional(),
-    authorization: z.boolean(),
-  })
-  .refine(
-    (data) => {
-      if (data.payment_method === "visa" || data.payment_method === "mastercard") {
-        return data.cardholder_name && data.cardholder_name.length >= 2;
-      }
-      return true;
-    },
-    { message: "Nombre del titular es requerido", path: ["cardholder_name"] }
-  )
-  .refine(
-    (data) => {
-      if (data.payment_method === "visa" || data.payment_method === "mastercard") {
-        const digits = (data.card_number || "").replace(/\D/g, "");
-        return digits.length >= 13 && digits.length <= 19;
-      }
-      return true;
-    },
-    { message: "Número de tarjeta inválido", path: ["card_number"] }
-  )
-  .refine(
-    (data) => {
-      if (data.payment_method === "visa" || data.payment_method === "mastercard") {
-        return /^\d{2}\/\d{2}$/.test(data.expiration || "");
-      }
-      return true;
-    },
-    { message: "Formato de expiración debe ser MM/YY", path: ["expiration"] }
-  )
-  .refine(
-    (data) => {
-      if (data.payment_method === "visa" || data.payment_method === "mastercard") {
-        const cvv = (data.cvv || "").replace(/\D/g, "");
-        return cvv.length >= 3 && cvv.length <= 4;
-      }
-      return true;
-    },
-    { message: "CVV debe tener 3 o 4 dígitos", path: ["cvv"] }
-  )
-  .refine(
-    (data) => {
-      if (data.payment_method === "visa" || data.payment_method === "mastercard") {
-        return data.authorization === true;
-      }
-      return true;
-    },
-    { message: "Debe autorizar el procesamiento de la tarjeta", path: ["authorization"] }
-  );
+const registrationSchema = z.object({
+  player1_name: z.string().min(2, "Nombre del jugador 1 es requerido"),
+  player1_size: z.string().min(1, "Seleccione talla"),
+  player2_name: z.string().optional(),
+  player2_size: z.string().optional(),
+  player3_name: z.string().optional(),
+  player3_size: z.string().optional(),
+  player4_name: z.string().optional(),
+  player4_size: z.string().optional(),
+  company: z.string().min(2, "Nombre de empresa es requerido"),
+  contact_name: z.string().min(2, "Nombre del contacto es requerido"),
+  email: z.string().email("Email inválido"),
+  phone: z.string().min(7, "Teléfono debe tener al menos 7 dígitos"),
+  // ✅ Solo dos opciones visibles. Para "tarjeta por teléfono" usamos "visa" (existente en backend)
+  payment_method: z.enum(["cheque", "visa"]),
+});
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
@@ -108,16 +56,11 @@ export default function RegistrationPage() {
       email: "",
       phone: "",
       payment_method: "cheque",
-      cardholder_name: "",
-      card_number: "",
-      expiration: "",
-      cvv: "",
-      authorization: false,
     },
   });
 
   const paymentMethod = watch("payment_method");
-  const isCardPayment = paymentMethod === "visa" || paymentMethod === "mastercard";
+  const isCardByPhone = paymentMethod === "visa";
 
   // Calculate player count based on filled names
   const player1 = watch("player1_name");
@@ -136,20 +79,6 @@ export default function RegistrationPage() {
 
   const totalAmount = playerCount * PRICE_PER_PLAYER;
 
-  const formatCardNumber = (value) => {
-    const digits = value.replace(/\D/g, "").slice(0, 16);
-    const groups = digits.match(/.{1,4}/g);
-    return groups ? groups.join(" ") : "";
-  };
-
-  const formatExpiration = (value) => {
-    const digits = value.replace(/\D/g, "").slice(0, 4);
-    if (digits.length >= 2) {
-      return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    }
-    return digits;
-  };
-
   const onSubmit = async (data) => {
     setIsSubmitting(true);
 
@@ -164,20 +93,14 @@ export default function RegistrationPage() {
       const payload = {
         players,
         company: data.company,
-        contact_name: data.contact_name,
+        contact_name: data.contact_name, // ✅ NEW
         email: data.email,
-        phone: data.phone,
-        payment_method: data.payment_method,
+        phone: data.phone, // ✅ obligatorio
+        payment_method: data.payment_method, // "cheque" o "visa" (visa = tarjeta por teléfono)
         amount: totalAmount,
-        authorization_accepted: data.authorization || false,
+        // ✅ mantenemos este campo por compatibilidad si el backend lo espera
+        authorization_accepted: false,
       };
-
-      if (isCardPayment) {
-        payload.cardholder_name = data.cardholder_name;
-        payload.card_number = (data.card_number || "").replace(/\s/g, "");
-        payload.expiration = data.expiration;
-        payload.cvv = data.cvv;
-      }
 
       const response = await axios.post(`${API}/registrations`, payload);
 
@@ -197,10 +120,7 @@ export default function RegistrationPage() {
       <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 md:py-12">
         {/* Header */}
         <header className="text-center mb-10">
-          <h1
-            className="header-title text-4xl md:text-5xl lg:text-6xl text-orange-500 mb-4"
-            data-testid="page-title"
-          >
+          <h1 className="header-title text-4xl md:text-5xl lg:text-6xl text-orange-500 mb-4" data-testid="page-title">
             AFCPR Golf Tournament
           </h1>
           <p className="text-2xl md:text-3xl text-white font-semibold mb-4">7th Edition</p>
@@ -280,7 +200,7 @@ export default function RegistrationPage() {
               <h2 className="text-xl md:text-2xl font-bold text-white">Información de Contacto</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-3">
                 <label className="block text-gray-400 text-sm font-medium">
                   Empresa <span className="text-orange-500">*</span>
@@ -298,18 +218,31 @@ export default function RegistrationPage() {
               <div className="space-y-3">
                 <label className="block text-gray-400 text-sm font-medium">
                   <User className="w-4 h-4 inline mr-1" />
-                  Contact Name <span className="text-orange-500">*</span>
+                  Nombre del Contacto <span className="text-orange-500">*</span>
                 </label>
                 <input
                   type="text"
                   {...register("contact_name")}
-                  placeholder="Nombre y apellido del contacto"
+                  placeholder="Nombre y apellido"
                   className="custom-input"
                   data-testid="contact-name-input"
                 />
-                {errors.contact_name && (
-                  <p className="text-red-500 text-sm">{errors.contact_name.message}</p>
-                )}
+                {errors.contact_name && <p className="text-red-500 text-sm">{errors.contact_name.message}</p>}
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-gray-400 text-sm font-medium">
+                  <Mail className="w-4 h-4 inline mr-1" />
+                  Email <span className="text-orange-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  {...register("email")}
+                  placeholder="correo@empresa.com"
+                  className="custom-input"
+                  data-testid="email-input"
+                />
+                {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
               </div>
 
               <div className="space-y-3">
@@ -328,23 +261,6 @@ export default function RegistrationPage() {
                 {errors.phone && <p className="text-red-500 text-sm">{errors.phone.message}</p>}
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <div className="space-y-3 md:col-span-2">
-                <label className="block text-gray-400 text-sm font-medium">
-                  <Mail className="w-4 h-4 inline mr-1" />
-                  Email <span className="text-orange-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  {...register("email")}
-                  placeholder="correo@empresa.com"
-                  className="custom-input"
-                  data-testid="email-input"
-                />
-                {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
-              </div>
-            </div>
           </section>
 
           {/* Payment Section */}
@@ -356,121 +272,35 @@ export default function RegistrationPage() {
 
             <div className="space-y-6">
               {/* Payment Method Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
                   { value: "cheque", label: "Cheque" },
-                  { value: "visa", label: "Visa" },
-                  { value: "mastercard", label: "Mastercard" },
+                  { value: "visa", label: "Tarjeta (por teléfono)" },
                 ].map((option) => (
                   <label
                     key={option.value}
                     className={`radio-option ${paymentMethod === option.value ? "selected" : ""}`}
                     data-testid={`payment-${option.value}`}
                   >
-                    <input type="radio" {...register("payment_method")} value={option.value} />
+                    <input
+                      type="radio"
+                      {...register("payment_method")}
+                      value={option.value}
+                      onChange={(e) => setValue("payment_method", e.target.value)}
+                    />
                     <span className="text-lg font-medium">{option.label}</span>
                   </label>
                 ))}
               </div>
 
-              {/* Card Details (conditional) */}
-              {isCardPayment && (
-                <div
-                  className="animate-fade-in space-y-6 pt-4 border-t border-gray-700"
-                  data-testid="card-details"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <label className="block text-gray-400 text-sm font-medium">
-                        Nombre del Titular <span className="text-orange-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        {...register("cardholder_name")}
-                        placeholder="Como aparece en la tarjeta"
-                        className="custom-input"
-                        data-testid="cardholder-name"
-                      />
-                      {errors.cardholder_name && (
-                        <p className="text-red-500 text-sm">{errors.cardholder_name.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="block text-gray-400 text-sm font-medium">
-                        Número de Tarjeta <span className="text-orange-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        {...register("card_number")}
-                        placeholder="1234 5678 9012 3456"
-                        inputMode="numeric"
-                        className="custom-input"
-                        data-testid="card-number"
-                        onChange={(e) => {
-                          const formatted = formatCardNumber(e.target.value);
-                          setValue("card_number", formatted);
-                        }}
-                        maxLength={19}
-                      />
-                      {errors.card_number && (
-                        <p className="text-red-500 text-sm">{errors.card_number.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <label className="block text-gray-400 text-sm font-medium">
-                        Expiración (MM/YY) <span className="text-orange-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        {...register("expiration")}
-                        placeholder="MM/YY"
-                        inputMode="numeric"
-                        className="custom-input"
-                        data-testid="expiration"
-                        onChange={(e) => {
-                          const formatted = formatExpiration(e.target.value);
-                          setValue("expiration", formatted);
-                        }}
-                        maxLength={5}
-                      />
-                      {errors.expiration && (
-                        <p className="text-red-500 text-sm">{errors.expiration.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="block text-gray-400 text-sm font-medium">
-                        CVV <span className="text-orange-500">*</span>
-                      </label>
-                      <input
-                        type="password"
-                        {...register("cvv")}
-                        placeholder="123"
-                        inputMode="numeric"
-                        className="custom-input"
-                        data-testid="cvv"
-                        maxLength={4}
-                      />
-                      {errors.cvv && <p className="text-red-500 text-sm">{errors.cvv.message}</p>}
-                    </div>
-                  </div>
-
-                  {/* Authorization Checkbox */}
-                  <div className="bg-[#1a1c1e] p-4 rounded-lg border border-gray-700">
-                    <label className="custom-checkbox" data-testid="authorization-checkbox">
-                      <input type="checkbox" {...register("authorization")} />
-                      <span className="text-gray-300 text-sm">
-                        Autorizo a AFCPR a procesar manualmente esta tarjeta para el registro del torneo.
-                      </span>
-                    </label>
-                    {errors.authorization && (
-                      <p className="text-red-500 text-sm mt-2">{errors.authorization.message}</p>
-                    )}
-                  </div>
+              {/* Card by phone info */}
+              {isCardByPhone && (
+                <div className="bg-[#1a1c1e] p-4 rounded-lg border border-orange-500/30">
+                  <p className="text-gray-200 text-sm leading-6">
+                    <span className="text-orange-500 font-semibold">Pago con tarjeta por teléfono:</span>{" "}
+                    No escriba información de tarjeta aquí. Luego del registro,{" "}
+                    <span className="font-semibold">AFCPR se comunicará con usted</span> al teléfono provisto para procesar el pago.
+                  </p>
                 </div>
               )}
 
