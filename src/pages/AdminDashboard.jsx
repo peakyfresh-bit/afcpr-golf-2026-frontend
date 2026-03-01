@@ -1,12 +1,12 @@
-// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v2 (Tournament Branding + Footer)
+// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v3 (No Card Storage + Paid Auditing)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "sonner";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TOKEN_KEY = "afcpr_admin_token";
 
-// 🎨 AFCPR Golf Tournament theme (match AdminLogin vibe)
 const THEME = {
   bgTop: "#0b0f14",
   bgMid: "#0c1117",
@@ -21,6 +21,7 @@ const THEME = {
   orange: "#ff7a18",
   orange2: "#ff9a3c",
   danger: "#ff4d4f",
+  ok: "#22c55e",
 };
 
 export default function AdminDashboard() {
@@ -30,7 +31,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [showCardDetails, setShowCardDetails] = useState(false);
+  const [busyId, setBusyId] = useState("");
 
   const token = useMemo(() => {
     try {
@@ -40,12 +41,30 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const totalAmount = useMemo(() => {
+  const authHeader = () => {
+    const jwt = token || localStorage.getItem(TOKEN_KEY) || "";
+    return { Authorization: `Bearer ${jwt}` };
+  };
+
+  const formatMoney = (value) => {
+    const n = typeof value === "number" ? value : Number(String(value).replace(/[^0-9.]/g, ""));
+    const safe = Number.isFinite(n) ? n : 0;
+    return safe.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  };
+
+  // ✅ Paid auditing: total = SUMA SOLO status=paid
+  const totalPaidAmount = useMemo(() => {
     return (items || []).reduce((sum, it) => {
+      const status = String(it?.status || "").toLowerCase();
+      if (status !== "paid") return sum;
       const raw = it?.amount ?? 0;
       const n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.]/g, ""));
       return sum + (Number.isFinite(n) ? n : 0);
     }, 0);
+  }, [items]);
+
+  const totalPendingCount = useMemo(() => {
+    return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
 
   const fetchRegistrations = async ({ isRefresh = false } = {}) => {
@@ -61,7 +80,7 @@ export default function AdminDashboard() {
       }
 
       const res = await axios.get(`${API}/admin/registrations`, {
-        headers: { Authorization: `Bearer ${jwt}` },
+        headers: authHeader(),
       });
 
       const data = res?.data;
@@ -104,66 +123,101 @@ export default function AdminDashboard() {
     navigate("/admin", { replace: true });
   };
 
-  const formatMoney = (value) => {
-    const n = typeof value === "number" ? value : Number(String(value).replace(/[^0-9.]/g, ""));
-    const safe = Number.isFinite(n) ? n : 0;
-    return safe.toLocaleString("en-US", { style: "currency", currency: "USD" });
-  };
-
+  // ✅ Payment label: si visa/mastercard => "Pago con Tarjeta"
   const paymentLabel = (pm) => {
     const v = String(pm || "").toLowerCase();
-    if (v === "visa") return "Visa";
-    if (v === "mastercard") return "Mastercard";
+    if (v === "visa" || v === "mastercard") return "Pago con Tarjeta";
     if (v === "checks" || v === "check" || v === "cheque") return "Cheque";
     return pm || "-";
   };
 
   // ✅ Contact: PRIORIDAD: contact_name → phone → email → "-"
-  // (Ahora mismo tu API NO devuelve contact_name, por eso verás phone hasta que lo guardemos en backend.)
   const contactLabel = (it) => {
     const name = String(it?.contact_name || it?.contactName || "").trim();
     return name || it?.phone || it?.phone_number || it?.email || "-";
   };
 
-  // ✅ Players: lista nombres (hasta 4)
+  // ✅ Players: Nombre (Talla)
   const playersLabel = (it) => {
     const players = Array.isArray(it?.players) ? it.players : [];
-    const names = players
-      .map((p) => String(p?.name || p?.player_name || "").trim())
+    const list = players
+      .map((p) => {
+        const name = String(p?.name || "").trim();
+        const size = String(p?.shirt_size || "").trim();
+        if (!name) return "";
+        return size ? `${name} (${size.toUpperCase()})` : name;
+      })
       .filter(Boolean);
-    return names.length ? names.join(", ") : "-";
+
+    return list.length ? list.join(", ") : "-";
   };
 
-  // ✅ Shirt sizes: vienen dentro de players
-  const shirtSizesLabel = (it) => {
-    const players = Array.isArray(it?.players) ? it.players : [];
-    const sizes = players
-      .map((p) => p?.shirt_size || p?.shirtSize || p?.shirt || p?.size)
-      .filter(Boolean)
-      .map((s) => String(s).toUpperCase().trim());
-    return sizes.length ? sizes.join(", ") : "-";
+  const createdLabel = (it) => {
+    const created = it?.created_at || it?.createdAt || it?.created || it?.timestamp || "";
+    if (!created) return "-";
+    const d = new Date(created);
+    return Number.isNaN(d.getTime()) ? String(created) : d.toLocaleString();
   };
 
-  // ✅ Card details: tu API devuelve cardholder_name + last4 + expiration.
-  // No devuelve CVV ni número completo (y eso es lo normal).
-  const getCardFields = (it) => {
-    const pm = String(it?.payment_method || it?.paymentMethod || "").toLowerCase();
-    const isCard = pm === "visa" || pm === "mastercard";
+  // ✅ Mark Paid: intentamos varias rutas típicas (sin tocar backend)
+  const tryMarkPaid = async (id) => {
+    const candidates = [
+      { method: "patch", url: `${API}/admin/registrations/${id}/status`, data: { status: "paid" } },
+      { method: "put", url: `${API}/admin/registrations/${id}/status`, data: { status: "paid" } },
+      { method: "post", url: `${API}/admin/registrations/${id}/status`, data: { status: "paid" } },
+      { method: "patch", url: `${API}/admin/registrations/${id}`, data: { status: "paid" } },
+      { method: "put", url: `${API}/admin/registrations/${id}`, data: { status: "paid" } },
+    ];
 
-    if (!isCard) return { cardholder: "-", number: "-", exp: "-", cvv: "-" };
+    let lastErr = null;
 
-    const cardholder = String(it?.cardholder_name || it?.cardHolderName || "").trim() || "-";
+    for (const c of candidates) {
+      try {
+        const res = await axios[c.method](c.url, c.data, { headers: authHeader() });
+        return res;
+      } catch (e) {
+        lastErr = e;
+        // si es 404 seguimos intentando; si es 405 también
+        const st = e?.response?.status;
+        if (st === 404 || st === 405) continue;
+        // otros errores (400/401/403/500) paramos
+        throw e;
+      }
+    }
 
-    // ✅ AQUI: tu backend usa "last4"
-    const last4 = String(it?.last4 || it?.card_last4 || it?.cardLast4 || "").replace(/\D/g, "").slice(-4);
-    const number = last4 ? `**** **** **** ${last4}` : "-";
+    throw lastErr || new Error("No status endpoint matched");
+  };
 
-    const exp = String(it?.expiration || it?.exp || it?.expiry || "").trim() || "-";
+  const markPaid = async (it) => {
+    const id = it?._id || it?.id;
+    if (!id) {
+      toast.error("Missing registration id");
+      return;
+    }
 
-    // CVV no viene del API (y normalmente no debe almacenarse/mostrarse)
-    const cvv = "-";
+    setBusyId(String(id));
+    try {
+      await tryMarkPaid(id);
 
-    return { cardholder, number, exp, cvv };
+      // Update UI optimista: marcar paid localmente
+      setItems((prev) =>
+        (prev || []).map((x) => {
+          const xid = x?._id || x?.id;
+          if (String(xid) !== String(id)) return x;
+          return { ...x, status: "paid" };
+        })
+      );
+
+      toast.success("Marked as paid");
+      await fetchRegistrations({ isRefresh: true });
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.message || "Failed to update status";
+      toast.error(msg);
+      // eslint-disable-next-line no-console
+      console.error("markPaid error:", err);
+    } finally {
+      setBusyId("");
+    }
   };
 
   return (
@@ -176,7 +230,6 @@ export default function AdminDashboard() {
         color: THEME.text,
       }}
     >
-      {/* Header */}
       <header className="w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
           <div
@@ -235,19 +288,6 @@ export default function AdminDashboard() {
               </button>
 
               <button
-                onClick={() => setShowCardDetails((v) => !v)}
-                className="h-10 px-4 rounded-xl border font-semibold transition active:scale-[0.99]"
-                style={{
-                  background: showCardDetails ? "rgba(255,122,24,0.14)" : "rgba(255,255,255,0.04)",
-                  borderColor: showCardDetails ? "rgba(255,122,24,0.35)" : THEME.border2,
-                  color: "rgba(255,255,255,0.90)",
-                }}
-                title="Toggle card details visibility"
-              >
-                {showCardDetails ? "Hide Card Details" : "Show Card Details"}
-              </button>
-
-              <button
                 onClick={onLogout}
                 className="h-10 px-4 rounded-xl border font-semibold transition active:scale-[0.99]"
                 style={{
@@ -263,163 +303,85 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Stats row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div
-              className="rounded-2xl border p-5"
-              style={{
-                background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
-                borderColor: THEME.border,
-              }}
-            >
+            <div className="rounded-2xl border p-5" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border }}>
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
                 Total Registrations
               </div>
               <div className="mt-2 text-3xl font-semibold">{(items || []).length}</div>
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
-                Pulled from admin API
+                Paid: {(items || []).filter((it) => String(it?.status || "").toLowerCase() === "paid").length} · Pending: {totalPendingCount}
               </div>
             </div>
 
-            <div
-              className="rounded-2xl border p-5"
-              style={{
-                background: `linear-gradient(180deg, rgba(255,122,24,0.10), ${THEME.panel})`,
-                borderColor: "rgba(255,122,24,0.25)",
-              }}
-            >
+            <div className="rounded-2xl border p-5" style={{ background: `linear-gradient(180deg, rgba(255,122,24,0.10), ${THEME.panel})`, borderColor: "rgba(255,122,24,0.25)" }}>
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
-                Total Amount
+                Total Amount (Paid)
               </div>
-              <div className="mt-2 text-3xl font-semibold">{formatMoney(totalAmount)}</div>
+              <div className="mt-2 text-3xl font-semibold">{formatMoney(totalPaidAmount)}</div>
               <div className="mt-1 text-sm" style={{ color: THEME.subtext }}>
-                Sum of all registration amounts
+                Audit total sums only PAID registrations
               </div>
             </div>
 
-            <div
-              className="rounded-2xl border p-5"
-              style={{
-                background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
-                borderColor: THEME.border,
-              }}
-            >
+            <div className="rounded-2xl border p-5" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border }}>
               <div className="text-xs uppercase tracking-[0.25em]" style={{ color: THEME.muted }}>
                 Status
               </div>
-              <div className="mt-2 text-lg font-semibold">
-                {loading ? "Loading..." : error ? "Attention needed" : "Connected"}
-              </div>
+              <div className="mt-2 text-lg font-semibold">{loading ? "Loading..." : error ? "Attention needed" : "Connected"}</div>
               <div className="mt-1 text-sm" style={{ color: error ? THEME.danger : THEME.subtext }}>
                 {error ? error : "Admin endpoint responding normally"}
               </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div
-            className="mt-6 rounded-2xl border overflow-hidden"
-            style={{
-              background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
-              borderColor: THEME.border,
-              boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
-            }}
-          >
+          <div className="mt-6 rounded-2xl border overflow-hidden" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border, boxShadow: "0 18px 50px rgba(0,0,0,0.28)" }}>
             <div className="p-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
                 <p className="text-sm" style={{ color: THEME.subtext }}>
-                  Review recent submissions and payment methods.
+                  Mark PAID after phone processing (no card data stored).
                 </p>
               </div>
-              <div
-                className="text-xs font-semibold px-3 py-1.5 rounded-xl border"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  borderColor: THEME.border2,
-                  color: "rgba(255,255,255,0.82)",
-                }}
-              >
+              <div className="text-xs font-semibold px-3 py-1.5 rounded-xl border" style={{ background: "rgba(255,255,255,0.03)", borderColor: THEME.border2, color: "rgba(255,255,255,0.82)" }}>
                 Items: {(items || []).length}
               </div>
             </div>
 
             <div className="w-full overflow-x-auto">
-              <table className="min-w-[1200px] w-full text-sm">
+              <table className="min-w-[1150px] w-full text-sm">
                 <thead>
-                  <tr
-                    style={{
-                      background: "rgba(255,255,255,0.03)",
-                      color: "rgba(255,255,255,0.78)",
-                    }}
-                  >
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Company
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Contact
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Email
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Players
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Shirt Size(s)
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Payment
-                    </th>
-                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Amount
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Card Details
-                    </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                      Created
-                    </th>
+                  <tr style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.78)" }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Company</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Contact</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Email</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Players</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Payment</th>
+                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Amount</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Status</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Created</th>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
-                        Loading registrations…
-                      </td>
+                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>Loading registrations…</td>
                     </tr>
                   ) : (items || []).length === 0 ? (
                     <tr>
-                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
-                        No registrations found.
-                      </td>
+                      <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>No registrations found.</td>
                     </tr>
                   ) : (
                     (items || []).map((it, idx) => {
-                      const created = it?.created_at || it?.createdAt || it?.created || it?.timestamp || "";
-                      const createdLabel = created
-                        ? (() => {
-                            const d = new Date(created);
-                            return Number.isNaN(d.getTime()) ? String(created) : d.toLocaleString();
-                          })()
-                        : "-";
-
-                      const pm = String(it?.payment_method || it?.paymentMethod || "");
-                      const isCard = pm.toLowerCase() === "visa" || pm.toLowerCase() === "mastercard";
-                      const card = getCardFields(it);
+                      const status = String(it?.status || "pending").toLowerCase();
+                      const isPaid = status === "paid";
 
                       return (
-                        <tr
-                          key={it?._id || it?.id || idx}
-                          style={{
-                            background: idx % 2 === 0 ? "rgba(255,255,255,0.00)" : "rgba(255,255,255,0.02)",
-                          }}
-                        >
+                        <tr key={it?._id || it?.id || idx} style={{ background: idx % 2 === 0 ? "rgba(255,255,255,0.00)" : "rgba(255,255,255,0.02)" }}>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {it?.company || it?.organization || "-"}
                           </td>
@@ -433,47 +395,44 @@ export default function AdminDashboard() {
                             {playersLabel(it)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            {shirtSizesLabel(it)}
-                          </td>
-                          <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            <span
-                              className="inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-semibold"
-                              style={{
-                                background: "rgba(255,122,24,0.08)",
-                                borderColor: "rgba(255,122,24,0.22)",
-                                color: "rgba(255,255,255,0.85)",
-                              }}
-                            >
-                              {paymentLabel(pm)}
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-semibold" style={{ background: "rgba(255,122,24,0.08)", borderColor: "rgba(255,122,24,0.22)", color: "rgba(255,255,255,0.85)" }}>
+                              {paymentLabel(it?.payment_method || it?.paymentMethod)}
                             </span>
                           </td>
                           <td className="px-5 py-3 border-b text-right" style={{ borderColor: THEME.border }}>
                             {formatMoney(it?.amount)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            {!isCard ? (
-                              "-"
-                            ) : !showCardDetails ? (
-                              <span style={{ color: THEME.subtext }}>Hidden (toggle to view)</span>
-                            ) : (
-                              <div className="text-xs leading-5" style={{ color: "rgba(255,255,255,0.86)" }}>
-                                <div>
-                                  <span style={{ color: THEME.muted }}>Name:</span> {card.cardholder}
-                                </div>
-                                <div>
-                                  <span style={{ color: THEME.muted }}>Number:</span> {card.number}
-                                </div>
-                                <div>
-                                  <span style={{ color: THEME.muted }}>Exp:</span> {card.exp}
-                                </div>
-                                <div>
-                                  <span style={{ color: THEME.muted }}>CVV:</span> {card.cvv}
-                                </div>
-                              </div>
-                            )}
+                            <span
+                              className="inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-semibold"
+                              style={{
+                                background: isPaid ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.03)",
+                                borderColor: isPaid ? "rgba(34,197,94,0.28)" : THEME.border2,
+                                color: isPaid ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
+                              }}
+                            >
+                              {isPaid ? "PAID" : "PENDING"}
+                            </span>
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            {createdLabel}
+                            {createdLabel(it)}
+                          </td>
+                          <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                            <button
+                              onClick={() => markPaid(it)}
+                              disabled={isPaid || busyId === String(it?._id || it?.id)}
+                              className="h-9 px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+                              style={{
+                                background: isPaid ? "rgba(255,255,255,0.03)" : "rgba(255,122,24,0.14)",
+                                borderColor: isPaid ? THEME.border2 : "rgba(255,122,24,0.35)",
+                                color: "rgba(255,255,255,0.95)",
+                                opacity: isPaid || busyId === String(it?._id || it?.id) ? 0.65 : 1,
+                                cursor: isPaid ? "not-allowed" : "pointer",
+                              }}
+                              title={isPaid ? "Already paid" : "Mark as paid after phone processing"}
+                            >
+                              {isPaid ? "Paid" : busyId === String(it?._id || it?.id) ? "Updating..." : "Mark Paid"}
+                            </button>
                           </td>
                         </tr>
                       );
@@ -483,24 +442,12 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
-
-          <div className="mt-3 text-xs" style={{ color: THEME.muted }}>
-            Note: Contact name will show once backend stores/returns contact_name.
-          </div>
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="w-full mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-          <div
-            className="rounded-2xl border px-5 py-4 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"
-            style={{
-              background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`,
-              borderColor: THEME.border,
-              color: THEME.subtext,
-            }}
-          >
+          <div className="rounded-2xl border px-5 py-4 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2" style={{ background: `linear-gradient(180deg, ${THEME.panel2}, ${THEME.panel})`, borderColor: THEME.border, color: THEME.subtext }}>
             <div className="font-medium" style={{ color: "rgba(255,255,255,0.78)" }}>
               © AFCPR Golf Tournament 2026 — Admin Access
             </div>

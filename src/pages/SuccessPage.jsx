@@ -10,21 +10,12 @@ export default function SuccessPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // 1) Si venimos desde submit, esto existe:
   const stateRegistration = location.state?.registration;
-
-  // 2) Si refrescamos, el state se pierde; usamos ?code=
   const codeFromUrl = searchParams.get("code");
 
-  // Estado final que usará la UI
   const [registration, setRegistration] = useState(stateRegistration || null);
-
-  // Si hay code en URL, queremos fetch para soportar refresh / link compartido.
   const [loading, setLoading] = useState(!!codeFromUrl && !stateRegistration);
-
-  // Guard: solo hacemos fetch si hay code en URL
   const shouldFetch = useMemo(() => !!codeFromUrl, [codeFromUrl]);
-
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -37,7 +28,6 @@ export default function SuccessPage() {
         setError("");
         setLoading(true);
 
-        // GET /api/registrations/confirm/{code}
         const res = await axios.get(`${API}/registrations/confirm/${encodeURIComponent(codeFromUrl)}`);
 
         if (!cancelled) setRegistration(res.data);
@@ -45,7 +35,6 @@ export default function SuccessPage() {
         const msg =
           err?.response?.data?.detail ||
           "No se pudo cargar el registro. Verifica el código de confirmación.";
-
         if (!cancelled) setError(msg);
       } finally {
         if (!cancelled) setLoading(false);
@@ -53,13 +42,11 @@ export default function SuccessPage() {
     }
 
     fetchByCode();
-
     return () => {
       cancelled = true;
     };
   }, [shouldFetch, codeFromUrl]);
 
-  // Si está cargando, mostramos algo simple
   if (loading) {
     return (
       <div className="app-container min-h-screen flex items-center justify-center px-4 py-8">
@@ -71,7 +58,6 @@ export default function SuccessPage() {
     );
   }
 
-  // Si no hay registration (y no está cargando), mostramos un mensaje en vez de mandar al home
   if (!registration) {
     return (
       <div className="app-container min-h-screen flex items-center justify-center px-4 py-8">
@@ -86,10 +72,7 @@ export default function SuccessPage() {
             </div>
           )}
 
-          <button
-            onClick={() => navigate("/")}
-            className="btn-secondary w-full flex items-center justify-center gap-2"
-          >
+          <button onClick={() => navigate("/")} className="btn-secondary w-full flex items-center justify-center gap-2">
             Volver al Registro
             <ArrowRight className="w-5 h-5" />
           </button>
@@ -98,63 +81,56 @@ export default function SuccessPage() {
     );
   }
 
+  const pm = String(registration.payment_method || "").toLowerCase();
+
+  // ✅ “Tarjeta por teléfono” se considera cuando pm es visa o mastercard
+  const isCardByPhone = pm === "visa" || pm === "mastercard";
+
   const paymentMethodLabel =
     {
       cheque: "Cheque",
-      visa: "Tarjeta (por teléfono)",
-      mastercard: "Tarjeta (por teléfono)",
       checks: "Cheque",
       check: "Cheque",
-    }[registration.payment_method] || registration.payment_method;
+      visa: "Pago con Tarjeta (por teléfono)",
+      mastercard: "Pago con Tarjeta (por teléfono)",
+    }[pm] || registration.payment_method;
 
-  const isCardByPhone =
-    String(registration.payment_method || "").toLowerCase() === "visa" ||
-    String(registration.payment_method || "").toLowerCase() === "mastercard";
-
-  const validPlayers = registration.players?.filter((p) => p.name?.trim()) || [];
+  const validPlayers = registration.players?.filter((p) => p?.name?.trim()) || [];
 
   return (
     <div className="app-container min-h-screen flex items-center justify-center px-4 py-8" data-testid="success-page">
       <div className="max-w-2xl w-full">
-        {/* Success Card */}
         <div className="form-card p-8 md:p-12 text-center">
-          {/* Success Icon */}
           <div className="mb-8">
             <div className="w-24 h-24 mx-auto bg-green-500/20 rounded-full flex items-center justify-center success-checkmark">
               <CheckCircle className="w-14 h-14 text-green-500" />
             </div>
           </div>
 
-          {/* Title */}
           <h1 className="header-title text-3xl md:text-4xl text-white mb-2" data-testid="success-title">
             ¡Registro Exitoso!
           </h1>
           <p className="text-gray-400 mb-8">Su registro ha sido procesado correctamente</p>
 
-          {/* Optional error (non-blocking) */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-200 p-4 rounded-lg mb-6 text-sm">
               {error}
             </div>
           )}
 
-          {/* Confirmation Code */}
           <div className="bg-[#1a1c1e] p-6 rounded-lg border border-orange-500/30 mb-6">
             <p className="text-gray-400 text-sm mb-2">Código de Confirmación</p>
-            <p
-              className="text-3xl md:text-4xl font-bold text-orange-500 tracking-wider"
-              data-testid="confirmation-code"
-            >
+            <p className="text-3xl md:text-4xl font-bold text-orange-500 tracking-wider" data-testid="confirmation-code">
               {registration.confirmation_code}
             </p>
           </div>
 
-          {/* ✅ Card-by-phone message (right after code) */}
+          {/* ✅ MENSAJE OBLIGATORIO para tarjeta por teléfono */}
           {isCardByPhone && (
             <div className="bg-[#1a1c1e] p-4 rounded-lg border border-orange-500/30 mb-8 text-left">
               <p className="text-gray-200 text-sm leading-6">
                 <span className="text-orange-500 font-semibold">Pago con tarjeta por teléfono:</span>{" "}
-                Nos comunicaremos con usted al número provisto para procesar el pago de la tarjeta.
+                Nos comunicaremos con usted para procesar el pago de la tarjeta.
               </p>
               <div className="mt-3 flex items-center gap-2 text-gray-300 text-sm">
                 <Phone className="w-4 h-4 text-orange-500" />
@@ -163,9 +139,7 @@ export default function SuccessPage() {
             </div>
           )}
 
-          {/* Registration Details */}
           <div className="text-left space-y-6 mb-8">
-            {/* Team Info */}
             <div className="bg-[#1a1c1e] p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
                 <Users className="w-5 h-5 text-orange-500" />
@@ -185,7 +159,6 @@ export default function SuccessPage() {
               </div>
             </div>
 
-            {/* Contact Info */}
             <div className="bg-[#1a1c1e] p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
                 <Building2 className="w-5 h-5 text-orange-500" />
@@ -198,7 +171,6 @@ export default function SuccessPage() {
               </div>
             </div>
 
-            {/* Payment Info */}
             <div className="bg-[#1a1c1e] p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
                 <CreditCard className="w-5 h-5 text-orange-500" />
@@ -207,10 +179,6 @@ export default function SuccessPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-white">{paymentMethodLabel}</p>
-                  {/* last4 no debería existir ya si quitamos tarjeta del form, pero si algún registro viejo lo tiene, lo mostramos */}
-                  {registration.last4 && (
-                    <p className="text-gray-400 text-sm">•••• {registration.last4}</p>
-                  )}
                 </div>
                 <p className="text-2xl font-bold text-orange-500" data-testid="payment-amount">
                   ${Number(registration.amount || 0).toLocaleString()}
@@ -219,13 +187,11 @@ export default function SuccessPage() {
             </div>
           </div>
 
-          {/* Email Notice */}
           <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-8">
             <Mail className="w-4 h-4" />
             <span>Se envió confirmación a su correo</span>
           </div>
 
-          {/* New Registration Button */}
           <button
             onClick={() => navigate("/")}
             className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -236,7 +202,6 @@ export default function SuccessPage() {
           </button>
         </div>
 
-        {/* Footer */}
         <footer className="mt-8 text-center text-gray-500 text-sm">
           <p>AFCPR Golf Tournament 2026</p>
         </footer>
