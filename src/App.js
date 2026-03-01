@@ -1,10 +1,12 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+
 import RegistrationPage from "@/pages/RegistrationPage";
 import SuccessPage from "@/pages/SuccessPage";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
+import RequireAdminAuth from "@/components/ui/RequireAdminAuth";
 
 function App() {
   return (
@@ -13,10 +15,20 @@ function App() {
         <Routes>
           <Route path="/" element={<RegistrationPage />} />
           <Route path="/success" element={<SuccessPage />} />
+
           <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+          <Route
+            path="/admin/dashboard"
+            element={
+              <RequireAdminAuth>
+                <AdminDashboard />
+              </RequireAdminAuth>
+            }
+          />
         </Routes>
       </BrowserRouter>
+
       <Toaster position="top-center" richColors />
     </div>
   );
