@@ -122,9 +122,25 @@ export default function AdminDashboard() {
     return pm || "-";
   };
 
-  // ✅ Contact: en tu Mongo existe "phone" (no contact_name).
+  // ✅ Contact: PRIORIDAD: contact_name → phone → email → "-"
   const contactLabel = (it) => {
-    return it?.phone || it?.phone_number || it?.contactPhone || it?.email || "-";
+    const name =
+      it?.contact_name ||
+      it?.contactName ||
+      it?.contact_full_name ||
+      it?.contactFullName ||
+      "";
+
+    const safeName = String(name || "").trim();
+
+    return (
+      safeName ||
+      it?.phone ||
+      it?.phone_number ||
+      it?.contactPhone ||
+      it?.email ||
+      "-"
+    );
   };
 
   // ✅ Shirt sizes: vienen dentro de players (Array)
@@ -229,7 +245,7 @@ export default function AdminDashboard() {
 
       {/* Content */}
       <main className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px--8 py-6">
           {/* Stats row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div
