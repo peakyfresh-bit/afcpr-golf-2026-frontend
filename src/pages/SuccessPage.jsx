@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, Navigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { CheckCircle, Users, Building2, CreditCard, Mail, ArrowRight } from "lucide-react";
+import { CheckCircle, Users, Building2, CreditCard, Mail, ArrowRight, Phone } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -37,17 +37,11 @@ export default function SuccessPage() {
         setError("");
         setLoading(true);
 
-        // ✅ IMPORTANTE:
-        // Este endpoint existe en tu backend:
         // GET /api/registrations/confirm/{code}
-        const res = await axios.get(
-          `${API}/registrations/confirm/${encodeURIComponent(codeFromUrl)}`
-        );
+        const res = await axios.get(`${API}/registrations/confirm/${encodeURIComponent(codeFromUrl)}`);
 
         if (!cancelled) setRegistration(res.data);
       } catch (err) {
-        // ⚠️ No pongas registration en null aquí, porque en refresh te redirige al home.
-        // Mejor mostramos error y dejamos lo que haya (o se quedará null y mostramos mensaje).
         const msg =
           err?.response?.data?.detail ||
           "No se pudo cargar el registro. Verifica el código de confirmación.";
@@ -78,24 +72,17 @@ export default function SuccessPage() {
   }
 
   // Si no hay registration (y no está cargando), mostramos un mensaje en vez de mandar al home
-  // Esto es mejor UX si la gente abre el link tarde o el code está mal.
   if (!registration) {
     return (
       <div className="app-container min-h-screen flex items-center justify-center px-4 py-8">
         <div className="form-card p-8 md:p-12 text-center max-w-2xl w-full">
-          <h1 className="header-title text-2xl md:text-3xl text-white mb-3">
-            No pudimos cargar tu registro
-          </h1>
-          <p className="text-gray-400 mb-6">
-            {error || "El enlace puede estar incompleto o el código no existe."}
-          </p>
+          <h1 className="header-title text-2xl md:text-3xl text-white mb-3">No pudimos cargar tu registro</h1>
+          <p className="text-gray-400 mb-6">{error || "El enlace puede estar incompleto o el código no existe."}</p>
 
           {codeFromUrl && (
             <div className="bg-[#1a1c1e] p-4 rounded-lg border border-orange-500/30 mb-6">
               <p className="text-gray-400 text-sm mb-1">Código detectado</p>
-              <p className="text-xl font-bold text-orange-500 tracking-wider">
-                {codeFromUrl}
-              </p>
+              <p className="text-xl font-bold text-orange-500 tracking-wider">{codeFromUrl}</p>
             </div>
           )}
 
@@ -114,9 +101,15 @@ export default function SuccessPage() {
   const paymentMethodLabel =
     {
       cheque: "Cheque",
-      visa: "Visa",
-      mastercard: "Mastercard",
+      visa: "Tarjeta (por teléfono)",
+      mastercard: "Tarjeta (por teléfono)",
+      checks: "Cheque",
+      check: "Cheque",
     }[registration.payment_method] || registration.payment_method;
+
+  const isCardByPhone =
+    String(registration.payment_method || "").toLowerCase() === "visa" ||
+    String(registration.payment_method || "").toLowerCase() === "mastercard";
 
   const validPlayers = registration.players?.filter((p) => p.name?.trim()) || [];
 
@@ -146,12 +139,29 @@ export default function SuccessPage() {
           )}
 
           {/* Confirmation Code */}
-          <div className="bg-[#1a1c1e] p-6 rounded-lg border border-orange-500/30 mb-8">
+          <div className="bg-[#1a1c1e] p-6 rounded-lg border border-orange-500/30 mb-6">
             <p className="text-gray-400 text-sm mb-2">Código de Confirmación</p>
-            <p className="text-3xl md:text-4xl font-bold text-orange-500 tracking-wider" data-testid="confirmation-code">
+            <p
+              className="text-3xl md:text-4xl font-bold text-orange-500 tracking-wider"
+              data-testid="confirmation-code"
+            >
               {registration.confirmation_code}
             </p>
           </div>
+
+          {/* ✅ Card-by-phone message (right after code) */}
+          {isCardByPhone && (
+            <div className="bg-[#1a1c1e] p-4 rounded-lg border border-orange-500/30 mb-8 text-left">
+              <p className="text-gray-200 text-sm leading-6">
+                <span className="text-orange-500 font-semibold">Pago con tarjeta por teléfono:</span>{" "}
+                Nos comunicaremos con usted al número provisto para procesar el pago de la tarjeta.
+              </p>
+              <div className="mt-3 flex items-center gap-2 text-gray-300 text-sm">
+                <Phone className="w-4 h-4 text-orange-500" />
+                <span className="font-semibold">{registration.phone || "-"}</span>
+              </div>
+            </div>
+          )}
 
           {/* Registration Details */}
           <div className="text-left space-y-6 mb-8">
@@ -166,7 +176,7 @@ export default function SuccessPage() {
                   validPlayers.map((player, index) => (
                     <div key={index} className="flex justify-between text-sm">
                       <span className="text-white">{player.name}</span>
-                      <span className="text-gray-400">{player.shirt_size}</span>
+                      <span className="text-gray-400">{player.shirt_size || "-"}</span>
                     </div>
                   ))
                 ) : (
@@ -182,9 +192,9 @@ export default function SuccessPage() {
                 <span className="text-gray-400 text-sm font-medium">Contacto</span>
               </div>
               <div className="space-y-2 text-sm">
-                <p className="text-white">{registration.company}</p>
-                <p className="text-gray-400">{registration.email}</p>
-                <p className="text-gray-400">{registration.phone}</p>
+                <p className="text-white">{registration.company || "-"}</p>
+                <p className="text-gray-400">{registration.email || "-"}</p>
+                <p className="text-gray-400">{registration.phone || "-"}</p>
               </div>
             </div>
 
@@ -197,10 +207,13 @@ export default function SuccessPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-white">{paymentMethodLabel}</p>
-                  {registration.last4 && <p className="text-gray-400 text-sm">•••• {registration.last4}</p>}
+                  {/* last4 no debería existir ya si quitamos tarjeta del form, pero si algún registro viejo lo tiene, lo mostramos */}
+                  {registration.last4 && (
+                    <p className="text-gray-400 text-sm">•••• {registration.last4}</p>
+                  )}
                 </div>
                 <p className="text-2xl font-bold text-orange-500" data-testid="payment-amount">
-                  ${registration.amount?.toLocaleString()}
+                  ${Number(registration.amount || 0).toLocaleString()}
                 </p>
               </div>
             </div>
