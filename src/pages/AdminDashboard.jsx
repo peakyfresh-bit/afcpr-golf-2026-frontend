@@ -41,7 +41,6 @@ export default function AdminDashboard() {
   }, []);
 
   const totalAmount = useMemo(() => {
-    // Suma robusta: amount puede venir number o string
     return (items || []).reduce((sum, it) => {
       const raw = it?.amount ?? 0;
       const n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.]/g, ""));
@@ -115,65 +114,54 @@ export default function AdminDashboard() {
     const v = String(pm || "").toLowerCase();
     if (v === "visa") return "Visa";
     if (v === "mastercard") return "Mastercard";
-    if (v === "checks" || v === "check") return "Checks";
+    if (v === "checks" || v === "check" || v === "cheque") return "Cheque";
     return pm || "-";
   };
 
   // ✅ Contact: PRIORIDAD: contact_name → phone → email → "-"
+  // (Ahora mismo tu API NO devuelve contact_name, por eso verás phone hasta que lo guardemos en backend.)
   const contactLabel = (it) => {
     const name = String(it?.contact_name || it?.contactName || "").trim();
     return name || it?.phone || it?.phone_number || it?.email || "-";
   };
 
-  // ✅ Players: lista nombres (hasta 4). Si vienen vacíos, no los muestra.
+  // ✅ Players: lista nombres (hasta 4)
   const playersLabel = (it) => {
     const players = Array.isArray(it?.players) ? it.players : [];
     const names = players
       .map((p) => String(p?.name || p?.player_name || "").trim())
       .filter(Boolean);
-
     return names.length ? names.join(", ") : "-";
   };
 
-  // ✅ Shirt sizes: vienen dentro de players (Array)
+  // ✅ Shirt sizes: vienen dentro de players
   const shirtSizesLabel = (it) => {
     const players = Array.isArray(it?.players) ? it.players : [];
     const sizes = players
       .map((p) => p?.shirt_size || p?.shirtSize || p?.shirt || p?.size)
       .filter(Boolean)
       .map((s) => String(s).toUpperCase().trim());
-
     return sizes.length ? sizes.join(", ") : "-";
   };
 
-  // ✅ Card details: SOLO si el API lo devuelve. Si no, será "-"
+  // ✅ Card details: tu API devuelve cardholder_name + last4 + expiration.
+  // No devuelve CVV ni número completo (y eso es lo normal).
   const getCardFields = (it) => {
     const pm = String(it?.payment_method || it?.paymentMethod || "").toLowerCase();
     const isCard = pm === "visa" || pm === "mastercard";
 
-    if (!isCard) {
-      return { cardholder: "-", number: "-", exp: "-", cvv: "-" };
-    }
+    if (!isCard) return { cardholder: "-", number: "-", exp: "-", cvv: "-" };
 
-    const cardholder = String(it?.cardholder_name || it?.cardHolderName || it?.card_name || "").trim() || "-";
+    const cardholder = String(it?.cardholder_name || it?.cardHolderName || "").trim() || "-";
 
-    // Puede venir como "4111111111111111" o enmascarada. No inventamos si no viene.
-    const rawNumber =
-      String(it?.card_number || it?.cardNumber || it?.card_last4 || it?.cardLast4 || "").trim() || "";
-
-    // Si solo viene last4, lo mostramos como **** **** **** 1234
-    let number = "-";
-    if (rawNumber) {
-      const digits = rawNumber.replace(/\D/g, "");
-      if (digits.length === 4) number = `**** **** **** ${digits}`;
-      else number = rawNumber; // tal cual venga (puede estar enmascarado o completo)
-    }
+    // ✅ AQUI: tu backend usa "last4"
+    const last4 = String(it?.last4 || it?.card_last4 || it?.cardLast4 || "").replace(/\D/g, "").slice(-4);
+    const number = last4 ? `**** **** **** ${last4}` : "-";
 
     const exp = String(it?.expiration || it?.exp || it?.expiry || "").trim() || "-";
 
-    // CVV normalmente NO se debe devolver por seguridad; si el API lo devuelve, lo mostramos.
-    const cvvRaw = String(it?.cvv || it?.cvc || "").trim();
-    const cvv = cvvRaw ? cvvRaw : "-";
+    // CVV no viene del API (y normalmente no debe almacenarse/mostrarse)
+    const cvv = "-";
 
     return { cardholder, number, exp, cvv };
   };
@@ -200,7 +188,6 @@ export default function AdminDashboard() {
             }}
           >
             <div className="flex items-start gap-4">
-              {/* Badge / icon */}
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center border"
                 style={{
@@ -218,18 +205,16 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h1
-                    className="text-xl sm:text-2xl font-semibold tracking-tight"
-                    style={{
-                      background: `linear-gradient(135deg, ${THEME.orange}, ${THEME.orange2})`,
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                    }}
-                  >
-                    AFCPR Golf Tournament 2026 — 7th Edition
-                  </h1>
-                </div>
+                <h1
+                  className="text-xl sm:text-2xl font-semibold tracking-tight"
+                  style={{
+                    background: `linear-gradient(135deg, ${THEME.orange}, ${THEME.orange2})`,
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  AFCPR Golf Tournament 2026 — 7th Edition
+                </h1>
                 <p className="text-sm mt-1" style={{ color: THEME.subtext }}>
                   Admin Dashboard — Registrations Overview
                 </p>
@@ -245,7 +230,6 @@ export default function AdminDashboard() {
                   borderColor: THEME.border2,
                   color: THEME.text,
                 }}
-                title="Refresh registrations"
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
               </button>
@@ -271,7 +255,6 @@ export default function AdminDashboard() {
                   borderColor: "rgba(255,77,79,0.28)",
                   color: "rgba(255,255,255,0.90)",
                 }}
-                title="Logout"
               >
                 Logout
               </button>
@@ -419,7 +402,6 @@ export default function AdminDashboard() {
                   ) : (
                     (items || []).map((it, idx) => {
                       const created = it?.created_at || it?.createdAt || it?.created || it?.timestamp || "";
-
                       const createdLabel = created
                         ? (() => {
                             const d = new Date(created);
@@ -428,8 +410,8 @@ export default function AdminDashboard() {
                         : "-";
 
                       const pm = String(it?.payment_method || it?.paymentMethod || "");
+                      const isCard = pm.toLowerCase() === "visa" || pm.toLowerCase() === "mastercard";
                       const card = getCardFields(it);
-                      const showThisRowCard = showCardDetails && (pm.toLowerCase() === "visa" || pm.toLowerCase() === "mastercard");
 
                       return (
                         <tr
@@ -469,19 +451,25 @@ export default function AdminDashboard() {
                             {formatMoney(it?.amount)}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            {showThisRowCard ? (
-                              <div className="text-xs leading-5" style={{ color: "rgba(255,255,255,0.86)" }}>
-                                <div><span style={{ color: THEME.muted }}>Name:</span> {card.cardholder}</div>
-                                <div><span style={{ color: THEME.muted }}>Number:</span> {card.number}</div>
-                                <div><span style={{ color: THEME.muted }}>Exp:</span> {card.exp}</div>
-                                <div><span style={{ color: THEME.muted }}>CVV:</span> {card.cvv}</div>
-                              </div>
+                            {!isCard ? (
+                              "-"
+                            ) : !showCardDetails ? (
+                              <span style={{ color: THEME.subtext }}>Hidden (toggle to view)</span>
                             ) : (
-                              <span style={{ color: THEME.subtext }}>
-                                {pm.toLowerCase() === "visa" || pm.toLowerCase() === "mastercard"
-                                  ? "Hidden (toggle to view)"
-                                  : "-"}
-                              </span>
+                              <div className="text-xs leading-5" style={{ color: "rgba(255,255,255,0.86)" }}>
+                                <div>
+                                  <span style={{ color: THEME.muted }}>Name:</span> {card.cardholder}
+                                </div>
+                                <div>
+                                  <span style={{ color: THEME.muted }}>Number:</span> {card.number}
+                                </div>
+                                <div>
+                                  <span style={{ color: THEME.muted }}>Exp:</span> {card.exp}
+                                </div>
+                                <div>
+                                  <span style={{ color: THEME.muted }}>CVV:</span> {card.cvv}
+                                </div>
+                              </div>
                             )}
                           </td>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
@@ -497,7 +485,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="mt-3 text-xs" style={{ color: THEME.muted }}>
-            Note: Contact/Players/Card fields only display if returned by the Admin API response.
+            Note: Contact name will show once backend stores/returns contact_name.
           </div>
         </div>
       </main>
