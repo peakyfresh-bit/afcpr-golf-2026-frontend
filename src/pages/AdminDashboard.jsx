@@ -1,4 +1,4 @@
-// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v6 PREMIUM++ (Filters + Search + Sort + Pagination + Charts + CSV Export)
+// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v7 PREMIUM+++ (Sort Fix + Sticky Header + Sticky Actions + Copy Code)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -24,6 +24,17 @@ const THEME = {
   ok: "#22c55e",
 };
 
+// ✅ Dark dropdown option styles (fix for “text not visible until selected”)
+const SELECT_DARK = {
+  background: "#0c1117",
+  color: "rgba(255,255,255,0.92)",
+  border: "1px solid rgba(255,255,255,0.14)",
+};
+const OPTION_DARK = {
+  backgroundColor: "#0c1117",
+  color: "rgba(255,255,255,0.92)",
+};
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
@@ -40,11 +51,6 @@ export default function AdminDashboard() {
 
   // ✅ Premium Sort (client-side)
   const [sortKey, setSortKey] = useState("date_desc"); // date_desc | date_asc | amount_desc | amount_asc
-
-  // ✅ Premium Pagination (client-side)
-  // pageSize: 10 | 25 | 50 | "all"
-  const [pageSize, setPageSize] = useState(25);
-  const [page, setPage] = useState(1);
 
   const token = useMemo(() => {
     try {
@@ -80,7 +86,7 @@ export default function AdminDashboard() {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() === "paid").length;
   }, [items]);
 
-  // ✅ Pending = NOT paid
+  // ✅ Pending = NOT paid (Opción 1)
   const totalPendingCount = useMemo(() => {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
@@ -217,7 +223,7 @@ export default function AdminDashboard() {
       .filter((it) => {
         const status = String(it?.status || "").toLowerCase();
         if (filterStatus === "paid") return status === "paid";
-        if (filterStatus === "pending") return status !== "paid";
+        if (filterStatus === "pending") return status !== "paid"; // ✅ option 1
         return true; // all
       })
       .filter((it) => {
@@ -292,46 +298,6 @@ export default function AdminDashboard() {
     return arr;
   }, [filteredItems, sortKey]);
 
-  // ✅ Reset page when view changes (filters/search/sort/pageSize)
-  useEffect(() => {
-    setPage(1);
-  }, [filterStatus, query, sortKey, pageSize]);
-
-  // ✅ Pagination calculations (client-side)
-  const totalRows = sortedItems.length;
-
-  const effectivePageSize = useMemo(() => {
-    if (pageSize === "all") return Math.max(1, totalRows || 1);
-    const n = Number(pageSize);
-    return Number.isFinite(n) && n > 0 ? n : 25;
-  }, [pageSize, totalRows]);
-
-  const totalPages = useMemo(() => {
-    if (!totalRows) return 1;
-    return Math.max(1, Math.ceil(totalRows / effectivePageSize));
-  }, [totalRows, effectivePageSize]);
-
-  const currentPage = useMemo(() => {
-    return Math.min(Math.max(1, page), totalPages);
-  }, [page, totalPages]);
-
-  const pagedItems = useMemo(() => {
-    if (!totalRows) return [];
-    if (pageSize === "all") return sortedItems;
-    const start = (currentPage - 1) * effectivePageSize;
-    return sortedItems.slice(start, start + effectivePageSize);
-  }, [sortedItems, currentPage, effectivePageSize, totalRows, pageSize]);
-
-  const pageStart = useMemo(() => {
-    if (!totalRows) return 0;
-    return (currentPage - 1) * effectivePageSize + 1;
-  }, [currentPage, effectivePageSize, totalRows]);
-
-  const pageEnd = useMemo(() => {
-    if (!totalRows) return 0;
-    return Math.min(totalRows, (currentPage - 1) * effectivePageSize + pagedItems.length);
-  }, [currentPage, effectivePageSize, totalRows, pagedItems.length]);
-
   // ✅ Mark Paid
   const tryMarkPaid = async (id) => {
     return axios.patch(
@@ -370,6 +336,37 @@ export default function AdminDashboard() {
       console.error("markPaid error:", err);
     } finally {
       setBusyId("");
+    }
+  };
+
+  // ✅ Copy confirmation code (per row)
+  const copyConfirmationCode = async (it) => {
+    const code = String(it?.confirmation_code || it?.confirmationCode || "").trim();
+    if (!code) {
+      toast.error("No confirmation code");
+      return;
+    }
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        // Fallback
+        const ta = document.createElement("textarea");
+        ta.value = code;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("Confirmation code copied");
+    } catch (e) {
+      toast.error("Copy failed");
+      // eslint-disable-next-line no-console
+      console.error("copyConfirmationCode error:", e);
     }
   };
 
@@ -417,7 +414,7 @@ export default function AdminDashboard() {
     return { paid, pending, total, pct, size, stroke, r, c, dash };
   }, [totalPaidCount, totalPendingCount]);
 
-  // ✅ CSV Export (frontend-only) using pagedItems (CURRENT VIEW = what you see)
+  // ✅ CSV Export (frontend-only) using sortedItems (current view + sort)
   const exportCsv = () => {
     try {
       const headers = [
@@ -441,7 +438,7 @@ export default function AdminDashboard() {
         return cleaned;
       };
 
-      const rows = pagedItems.map((it) => {
+      const rows = sortedItems.map((it) => {
         const id = it?.id || it?._id || "";
         const company = it?.company || it?.organization || "";
         const contact = contactLabel(it);
@@ -481,7 +478,7 @@ export default function AdminDashboard() {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `afcpr_registrations_${filterStatus}_${sortKey}_page-${currentPage}_${stamp}.csv`;
+      a.download = `afcpr_registrations_${filterStatus}_${sortKey}_${stamp}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -503,6 +500,24 @@ export default function AdminDashboard() {
       return String(lastUpdated);
     }
   }, [lastUpdated]);
+
+  // ✅ Sticky header styles
+  const thBase = {
+    borderColor: THEME.border,
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
+    background: "rgba(12,17,23,0.92)", // dark solid-ish so it stays readable
+    backdropFilter: "blur(8px)",
+  };
+
+  // ✅ Sticky Actions column styles
+  const thActions = {
+    ...thBase,
+    right: 0,
+    zIndex: 30, // above other sticky th
+    boxShadow: "-12px 0 18px rgba(0,0,0,0.28)",
+  };
 
   return (
     <div
@@ -714,12 +729,12 @@ export default function AdminDashboard() {
                     color: "rgba(255,255,255,0.95)",
                     width: "100%",
                   }}
-                  title="Export the current view (filters + search + sort + page) to CSV"
+                  title="Export the current view (filters + search + sort) to CSV"
                 >
                   Export CSV (Current View)
                 </button>
                 <div className="mt-2 text-xs" style={{ color: THEME.muted }}>
-                  Exports what you see: {filterStatus.toUpperCase()} + Search + Sort + Page
+                  Exports what you see: {filterStatus.toUpperCase()} + Search + Sort
                 </div>
               </div>
             </div>
@@ -754,6 +769,7 @@ export default function AdminDashboard() {
             }}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              {/* Left */}
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
@@ -763,8 +779,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Right */}
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
-                {/* Row 1: Showing + Chips + Sort + Page Size + Pager */}
+                {/* Row 1 */}
                 <div className="flex flex-wrap items-center gap-2">
                   <div
                     className="text-xs font-semibold px-3 py-2 rounded-xl border"
@@ -774,12 +791,9 @@ export default function AdminDashboard() {
                       color: "rgba(255,255,255,0.82)",
                       lineHeight: 1,
                     }}
-                    title="Rows shown on this page"
+                    title="Number of rows currently shown (after filters + search + sort)"
                   >
-                    Showing: {pagedItems.length}{" "}
-                    <span style={{ color: THEME.muted, fontWeight: 700 }}>
-                      ({pageStart}-{pageEnd} of {totalRows})
-                    </span>
+                    Showing: {sortedItems.length}
                   </div>
 
                   <button type="button" onClick={() => setFilterStatus("all")} style={chipStyle(filterStatus === "all")}>
@@ -802,7 +816,7 @@ export default function AdminDashboard() {
                     Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
                   </button>
 
-                  {/* Sort */}
+                  {/* ✅ Sort (FIXED dropdown visibility) */}
                   <div className="flex items-center gap-2 ml-1">
                     <span className="text-xs font-semibold" style={{ color: THEME.muted }}>
                       Sort:
@@ -810,99 +824,30 @@ export default function AdminDashboard() {
                     <select
                       value={sortKey}
                       onChange={(e) => setSortKey(e.target.value)}
-                      className="h-[38px] px-3 rounded-xl border text-sm outline-none"
+                      className="h-[38px] px-3 rounded-xl text-sm outline-none"
                       style={{
-                        background: "rgba(255,255,255,0.03)",
-                        borderColor: THEME.border2,
-                        color: "rgba(255,255,255,0.90)",
+                        ...SELECT_DARK,
+                        borderRadius: "12px",
                       }}
                       title="Sort current view"
                     >
-                      <option value="date_desc">Newest</option>
-                      <option value="date_asc">Oldest</option>
-                      <option value="amount_desc">Amount (High → Low)</option>
-                      <option value="amount_asc">Amount (Low → High)</option>
+                      <option value="date_desc" style={OPTION_DARK}>
+                        Newest
+                      </option>
+                      <option value="date_asc" style={OPTION_DARK}>
+                        Oldest
+                      </option>
+                      <option value="amount_desc" style={OPTION_DARK}>
+                        Amount (High → Low)
+                      </option>
+                      <option value="amount_asc" style={OPTION_DARK}>
+                        Amount (Low → High)
+                      </option>
                     </select>
-                  </div>
-
-                  {/* Page size */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold" style={{ color: THEME.muted }}>
-                      Show:
-                    </span>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setPageSize(v === "all" ? "all" : Number(v));
-                      }}
-                      className="h-[38px] px-3 rounded-xl border text-sm outline-none"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        borderColor: THEME.border2,
-                        color: "rgba(255,255,255,0.90)",
-                      }}
-                      title="Rows per page"
-                    >
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value="all">All</option>
-                    </select>
-                  </div>
-
-                  {/* Pager */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage <= 1}
-                      className="h-[38px] px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        borderColor: THEME.border2,
-                        color: "rgba(255,255,255,0.90)",
-                        opacity: currentPage <= 1 ? 0.5 : 1,
-                        cursor: currentPage <= 1 ? "not-allowed" : "pointer",
-                      }}
-                      title="Previous page"
-                    >
-                      Prev
-                    </button>
-
-                    <div
-                      className="text-xs font-semibold px-3 py-2 rounded-xl border"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        borderColor: THEME.border2,
-                        color: "rgba(255,255,255,0.82)",
-                        lineHeight: 1,
-                      }}
-                      title="Current page"
-                    >
-                      Page {currentPage} / {totalPages}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage >= totalPages}
-                      className="h-[38px] px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        borderColor: THEME.border2,
-                        color: "rgba(255,255,255,0.90)",
-                        opacity: currentPage >= totalPages ? 0.5 : 1,
-                        cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
-                      }}
-                      title="Next page"
-                    >
-                      Next
-                    </button>
                   </div>
                 </div>
 
-                {/* Row 2: Search + Clear */}
+                {/* Row 2 */}
                 <div className="flex items-center gap-2">
                   <input
                     value={query}
@@ -934,7 +879,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ✅ Table */}
+          {/* ✅ Table (Sticky header + Sticky actions col) */}
           <div
             className="mt-4 rounded-2xl border overflow-hidden"
             style={{
@@ -943,35 +888,35 @@ export default function AdminDashboard() {
               boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
             }}
           >
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[1150px] w-full text-sm">
+            <div className="w-full overflow-x-auto" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+              <table className="min-w-[1150px] w-full text-sm" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
                 <thead>
-                  <tr style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.78)" }}>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                  <tr style={{ color: "rgba(255,255,255,0.78)" }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Company
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Contact
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Email
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Players
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Payment
                     </th>
-                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-right font-semibold px-5 py-3 border-b" style={thBase}>
                       Amount
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Status
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thBase}>
                       Created
                     </th>
-                    <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
+                    <th className="text-left font-semibold px-5 py-3 border-b" style={thActions}>
                       Actions
                     </th>
                   </tr>
@@ -984,25 +929,23 @@ export default function AdminDashboard() {
                         Loading registrations…
                       </td>
                     </tr>
-                  ) : pagedItems.length === 0 ? (
+                  ) : sortedItems.length === 0 ? (
                     <tr>
                       <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
                         No registrations found.
                       </td>
                     </tr>
                   ) : (
-                    pagedItems.map((it, idx) => {
+                    sortedItems.map((it, idx) => {
                       const status = String(it?.status || "pending").toLowerCase();
                       const isPaid = status === "paid";
                       const rowId = String(it?.id || it?._id || "");
+                      const code = String(it?.confirmation_code || it?.confirmationCode || "").trim();
+
+                      const rowBg = idx % 2 === 0 ? "rgba(255,255,255,0.00)" : "rgba(255,255,255,0.02)";
 
                       return (
-                        <tr
-                          key={rowId || idx}
-                          style={{
-                            background: idx % 2 === 0 ? "rgba(255,255,255,0.00)" : "rgba(255,255,255,0.02)",
-                          }}
-                        >
+                        <tr key={rowId || idx} style={{ background: rowBg }}>
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {it?.company || it?.organization || "-"}
                           </td>
@@ -1045,22 +988,54 @@ export default function AdminDashboard() {
                           <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                             {createdLabel(it)}
                           </td>
-                          <td className="px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
-                            <button
-                              onClick={() => markPaid(it)}
-                              disabled={isPaid || busyId === rowId}
-                              className="h-9 px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
-                              style={{
-                                background: isPaid ? "rgba(255,255,255,0.03)" : "rgba(255,122,24,0.14)",
-                                borderColor: isPaid ? THEME.border2 : "rgba(255,122,24,0.35)",
-                                color: "rgba(255,255,255,0.95)",
-                                opacity: isPaid || busyId === rowId ? 0.65 : 1,
-                                cursor: isPaid ? "not-allowed" : "pointer",
-                              }}
-                              title={isPaid ? "Already paid" : "Mark as paid after phone processing"}
-                            >
-                              {isPaid ? "Paid" : busyId === rowId ? "Updating..." : "Mark Paid"}
-                            </button>
+
+                          {/* ✅ Sticky Actions column */}
+                          <td
+                            className="px-5 py-3 border-b"
+                            style={{
+                              borderColor: THEME.border,
+                              position: "sticky",
+                              right: 0,
+                              zIndex: 10,
+                              background: rowBg,
+                              boxShadow: "-12px 0 18px rgba(0,0,0,0.22)",
+                              backdropFilter: "blur(6px)",
+                            }}
+                          >
+                            <div className="flex items-center gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => copyConfirmationCode(it)}
+                                disabled={!code}
+                                className="h-9 px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+                                style={{
+                                  background: code ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.02)",
+                                  borderColor: THEME.border2,
+                                  color: "rgba(255,255,255,0.90)",
+                                  opacity: code ? 1 : 0.55,
+                                  cursor: code ? "pointer" : "not-allowed",
+                                }}
+                                title={code ? `Copy confirmation code: ${code}` : "No confirmation code"}
+                              >
+                                Copy Code
+                              </button>
+
+                              <button
+                                onClick={() => markPaid(it)}
+                                disabled={isPaid || busyId === rowId}
+                                className="h-9 px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+                                style={{
+                                  background: isPaid ? "rgba(255,255,255,0.03)" : "rgba(255,122,24,0.14)",
+                                  borderColor: isPaid ? THEME.border2 : "rgba(255,122,24,0.35)",
+                                  color: "rgba(255,255,255,0.95)",
+                                  opacity: isPaid || busyId === rowId ? 0.65 : 1,
+                                  cursor: isPaid ? "not-allowed" : "pointer",
+                                }}
+                                title={isPaid ? "Already paid" : "Mark as paid after phone processing"}
+                              >
+                                {isPaid ? "Paid" : busyId === rowId ? "Updating..." : "Mark Paid"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
