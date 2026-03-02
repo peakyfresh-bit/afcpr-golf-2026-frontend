@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,9 +7,10 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Users, Building2, CreditCard, Mail, Phone, CheckCircle, User } from "lucide-react";
 
+import AFCPRLogo from "../assets/afcpr-golf-logo.png";
+
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// ✅ XS removido (no hay camisas XS)
 const SHIRT_SIZES = ["S", "M", "L", "XL", "XXL"];
 const PRICE_PER_PLAYER = 275;
 
@@ -26,7 +27,6 @@ const registrationSchema = z.object({
   contact_name: z.string().min(2, "Nombre del contacto es requerido"),
   email: z.string().email("Email inválido"),
   phone: z.string().min(7, "Teléfono debe tener al menos 7 dígitos"),
-  // ✅ Solo dos opciones visibles. Para "tarjeta por teléfono" usamos "visa" (existente en backend)
   payment_method: z.enum(["cheque", "visa"]),
 });
 
@@ -34,6 +34,16 @@ export default function RegistrationPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);
+
+  const WATERMARKS = useMemo(
+    () => [
+      { top: "-10%", left: "-10%", w: 600, rot: -14, op: 0.06 },
+      { top: "10%", left: "70%", w: 400, rot: 12, op: 0.04 },
+      { top: "60%", left: "-15%", w: 700, rot: -8, op: 0.05 },
+      { top: "75%", left: "65%", w: 500, rot: 18, op: 0.04 },
+    ],
+    []
+  );
 
   const {
     register,
@@ -63,7 +73,6 @@ export default function RegistrationPage() {
   const paymentMethod = watch("payment_method");
   const isCardByPhone = paymentMethod === "visa";
 
-  // Calculate player count based on filled names
   const player1 = watch("player1_name");
   const player2 = watch("player2_name");
   const player3 = watch("player3_name");
@@ -82,7 +91,6 @@ export default function RegistrationPage() {
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
-
     try {
       const players = [
         { name: data.player1_name || "", shirt_size: data.player1_size || "" },
@@ -94,12 +102,11 @@ export default function RegistrationPage() {
       const payload = {
         players,
         company: data.company,
-        contact_name: data.contact_name, // ✅ NEW
+        contact_name: data.contact_name,
         email: data.email,
-        phone: data.phone, // ✅ obligatorio
-        payment_method: data.payment_method, // "cheque" o "visa" (visa = tarjeta por teléfono)
+        phone: data.phone,
+        payment_method: data.payment_method,
         amount: totalAmount,
-        // ✅ mantenemos este campo por compatibilidad si el backend lo espera
         authorization_accepted: false,
       };
 
@@ -117,35 +124,83 @@ export default function RegistrationPage() {
   };
 
   return (
-    <div className="app-container min-h-screen" data-testid="registration-page">
-      <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 md:py-12">
-        {/* Header */}
-        <header className="text-center mb-10">
-          <h1 className="header-title text-4xl md:text-5xl lg:text-6xl text-orange-500 mb-4" data-testid="page-title">
-            AFCPR Golf Tournament
-          </h1>
-          <p className="text-2xl md:text-3xl text-white font-semibold mb-4">7th Edition</p>
+    <div
+      className="min-h-screen relative overflow-hidden"
+      data-testid="registration-page"
+      style={{
+        background:
+          "radial-gradient(900px 500px at 20% 10%, rgba(245,158,11,0.18), transparent 60%), radial-gradient(900px 500px at 80% 30%, rgba(59,130,246,0.10), transparent 60%), #05070a",
+      }}
+    >
+      {/* WATERMARKS */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        {WATERMARKS.map((m, idx) => (
+          <img
+            key={idx}
+            src={AFCPRLogo}
+            alt=""
+            draggable={false}
+            style={{
+              position: "absolute",
+              top: m.top,
+              left: m.left,
+              width: m.w,
+              opacity: m.op,
+              transform: `rotate(${m.rot}deg)`,
+              filter: "saturate(1.1) contrast(1.1)",
+              userSelect: "none",
+            }}
+          />
+        ))}
+      </div>
 
-          <div className="flex flex-wrap justify-center gap-4 md:gap-8 text-gray-400 text-sm md:text-base">
-            <span>Registro desde 7:00 AM</span>
-            <span className="text-orange-500">|</span>
-            <span>Shotgun Start: 8:30 AM</span>
-            <span className="text-orange-500">|</span>
-            <span>Inscripciones hasta el 1 de mayo de 2026</span>
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-10 md:px-8 md:py-14">
+        {/* HEADER */}
+        <header className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <img
+              src={AFCPRLogo}
+              alt="AFCPR Golf Tournament 2026"
+              className="w-[260px] md:w-[320px]"
+              draggable={false}
+            />
           </div>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-6">
-            <div className="bg-[#232629] px-6 py-3 rounded-lg border border-gray-700">
-              <span className="text-gray-400 text-sm">Formato</span>
-              <p className="text-white font-semibold">4 Man Scramble</p>
-            </div>
-            <div className="bg-[#232629] px-6 py-3 rounded-lg border border-gray-700">
-              <span className="text-gray-400 text-sm">Costo</span>
-              <p className="text-orange-500 font-bold text-xl">${PRICE_PER_PLAYER} / jugador</p>
-            </div>
+          <div className="flex flex-wrap justify-center gap-4 text-gray-300 text-sm md:text-base">
+            <span>
+              <span className="text-orange-500 font-semibold">Día:</span> Jueves 14 de Mayo 2026
+            </span>
+            <span className="text-orange-500/60">|</span>
+            <span>
+              <span className="text-orange-500 font-semibold">Lugar:</span> El Legado Golf Resort
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap justify-center gap-4 text-gray-400 text-sm md:text-base">
+            <span>
+              <span className="text-orange-500 font-semibold">Registro:</span> 7:00 AM
+            </span>
+            <span className="text-orange-500/60">|</span>
+            <span>
+              <span className="text-orange-500 font-semibold">Shotgun:</span> 8:30 AM
+            </span>
+            <span className="text-orange-500/60">|</span>
+            <span>
+              <span className="text-orange-500 font-semibold">Formato:</span> 4 Man Scramble
+            </span>
+          </div>
+
+          {/* AVISO */}
+          <div className="mt-8 max-w-3xl mx-auto bg-orange-500/10 border border-orange-500/40 rounded-xl p-5 text-left">
+            <div className="text-orange-500 font-bold mb-2">Aviso Importante</div>
+            <p className="text-gray-200 text-sm md:text-base leading-6">
+              Si desea reservar su espacio y realizar el pago en la puerta mediante cheque o efectivo, deberá
+              proporcionar una tarjeta de crédito como garantía de pago.
+            </p>
           </div>
         </header>
 
+        {/* FORM */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
           {/* Team Section */}
           <section className="form-card p-6 md:p-8" data-testid="team-section">
@@ -189,12 +244,15 @@ export default function RegistrationPage() {
                   {errors?.[`player${num}_name`] && (
                     <p className="text-red-500 text-sm">{errors[`player${num}_name`].message}</p>
                   )}
+                  {errors?.[`player${num}_size`] && num === 1 && (
+                    <p className="text-red-500 text-sm">{errors[`player${num}_size`].message}</p>
+                  )}
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Contact Section */}
+          {/* Contact Section ✅ RESTORED */}
           <section className="form-card p-6 md:p-8" data-testid="contact-section">
             <div className="flex items-center gap-3 mb-6">
               <Building2 className="w-6 h-6 text-orange-500" />
@@ -264,7 +322,7 @@ export default function RegistrationPage() {
             </div>
           </section>
 
-          {/* Payment Section */}
+          {/* Payment Section ✅ RESTORED */}
           <section className="form-card p-6 md:p-8" data-testid="payment-section">
             <div className="flex items-center gap-3 mb-6">
               <CreditCard className="w-6 h-6 text-orange-500" />
@@ -324,7 +382,7 @@ export default function RegistrationPage() {
             </div>
           </section>
 
-          {/* Submit Button */}
+          {/* Submit ✅ PREMIUM RESTORED */}
           <button
             type="submit"
             disabled={isSubmitting}
