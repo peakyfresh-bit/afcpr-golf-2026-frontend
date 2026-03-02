@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Users, Building2, CreditCard, Mail, Phone, CheckCircle, User } from "lucide-react";
 
 import AFCPRLogo from "../assets/afcpr-golf-logo.webp";
+import WatermarkPattern from "../assets/golf-watermark-pattern.png";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -34,16 +35,6 @@ export default function RegistrationPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);
-
-  const WATERMARKS = useMemo(
-    () => [
-      { top: "-10%", left: "-10%", w: 600, rot: -14, op: 0.06 },
-      { top: "10%", left: "70%", w: 400, rot: 12, op: 0.04 },
-      { top: "60%", left: "-15%", w: 700, rot: -8, op: 0.05 },
-      { top: "75%", left: "65%", w: 500, rot: 18, op: 0.04 },
-    ],
-    []
-  );
 
   const {
     register,
@@ -132,86 +123,88 @@ export default function RegistrationPage() {
           "radial-gradient(900px 500px at 20% 10%, rgba(245,158,11,0.18), transparent 60%), radial-gradient(900px 500px at 80% 30%, rgba(59,130,246,0.10), transparent 60%), #05070a",
       }}
     >
-      {/* WATERMARKS */}
-      <div className="pointer-events-none absolute inset-0 z-0">
-        {WATERMARKS.map((m, idx) => (
-          <img
-            key={idx}
-            src={AFCPRLogo}
-            alt=""
-            draggable={false}
-            style={{
-              position: "absolute",
-              top: m.top,
-              left: m.left,
-              width: m.w,
-              opacity: m.op,
-              transform: `rotate(${m.rot}deg)`,
-              filter: "saturate(1.1) contrast(1.1)",
-              userSelect: "none",
-            }}
-          />
-        ))}
+      {/* WATERMARK PATTERN (VISIBLE + PREMIUM) */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${WatermarkPattern})`,
+            backgroundRepeat: "repeat",
+            backgroundSize: "1000px",
+            backgroundPosition: "center",
+            opacity: 0.16,
+            transform: "rotate(-10deg) scale(1.12)",
+            filter: "brightness(1.30) contrast(1.1) saturate(1.05)",
+            mixBlendMode: "screen",
+          }}
+        />
+        {/* Velo MUY suave para que no compita con el contenido */}
+        <div className="absolute inset-0 bg-black/10" />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-10 md:px-8 md:py-14">
         {/* HEADER */}
-<header className="text-center mb-14">
-  {/* Logo con glow sutil */}
-  <div className="relative flex justify-center mb-10">
-    <div className="absolute inset-0 flex justify-center">
-      <div className="h-32 w-32 rounded-full bg-orange-500/10 blur-3xl" />
-    </div>
+        <header className="text-center mb-14">
+          {/* Logo con glow sutil */}
+          <div className="relative flex justify-center mb-10">
+            <div className="absolute inset-0 flex justify-center">
+              <div className="h-32 w-32 rounded-full bg-orange-500/10 blur-3xl" />
+            </div>
 
-    <img
-      src={AFCPRLogo}
-      alt="AFCPR Golf Tournament 2026"
-      className="relative w-[250px] md:w-[340px] drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)]"
-      draggable={false}
-    />
-  </div>
+            <img
+              src={AFCPRLogo}
+              alt="AFCPR Golf Tournament 2026"
+              width="340"
+              height="140"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              className="relative w-[250px] md:w-[340px] drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)]"
+              draggable={false}
+            />
+          </div>
 
-  {/* Línea elegante debajo del logo */}
-  <div className="mx-auto mb-8 h-px w-44 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
+          {/* Línea elegante debajo del logo */}
+          <div className="mx-auto mb-8 h-px w-44 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
 
-  {/* Info del evento estilo premium compacto */}
-  <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-4 text-sm md:text-base">
-    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
-      <span className="text-orange-500 font-semibold">Día:</span> Jueves 14 de Mayo 2026
-    </span>
+          {/* Info del evento estilo premium compacto */}
+          <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-4 text-sm md:text-base">
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+              <span className="text-orange-500 font-semibold">Día:</span> Jueves 14 de Mayo 2026
+            </span>
 
-    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
-      <span className="text-orange-500 font-semibold">Lugar:</span> El Legado Golf Resort
-    </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+              <span className="text-orange-500 font-semibold">Lugar:</span> El Legado Golf Resort
+            </span>
 
-    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
-      <span className="text-orange-500 font-semibold">Registro:</span> 7:00 AM
-    </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+              <span className="text-orange-500 font-semibold">Registro:</span> 7:00 AM
+            </span>
 
-    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
-      <span className="text-orange-500 font-semibold">Shotgun:</span> 8:30 AM
-    </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+              <span className="text-orange-500 font-semibold">Shotgun:</span> 8:30 AM
+            </span>
 
-    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
-      <span className="text-orange-500 font-semibold">Formato:</span> 4 Man Scramble
-    </span>
-  </div>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+              <span className="text-orange-500 font-semibold">Formato:</span> 4 Man Scramble
+            </span>
+          </div>
 
-  {/* Aviso premium refinado */}
-  <div className="mt-10 max-w-3xl mx-auto rounded-2xl border border-orange-500/30 bg-white/[0.04] backdrop-blur-xl p-6 text-left shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
-  <div className="flex items-center gap-3 mb-3">
-    <div className="text-orange-400 font-bold tracking-wide text-sm md:text-base">
-      Aviso Importante
-    </div>
-    <div className="flex-1 h-px bg-gradient-to-r from-orange-500/40 to-transparent" />
-  </div>
+          {/* Aviso premium refinado (glass que te gustaba) */}
+          <div className="mt-10 max-w-3xl mx-auto rounded-2xl border border-orange-500/30 bg-white/[0.04] backdrop-blur-xl p-6 text-left shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="text-orange-400 font-bold tracking-wide text-sm md:text-base">
+                Aviso Importante
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-r from-orange-500/40 to-transparent" />
+            </div>
 
-  <p className="text-gray-200 text-sm md:text-base leading-6">
-    Si desea reservar su espacio y realizar el pago en la puerta mediante cheque o efectivo,
-    deberá proporcionar una tarjeta de crédito como garantía de pago.
-  </p>
-</div>
-</header>
+            <p className="text-gray-200 text-sm md:text-base leading-6">
+              Si desea reservar su espacio y realizar el pago en la puerta mediante cheque o efectivo,
+              deberá proporcionar una tarjeta de crédito como garantía de pago.
+            </p>
+          </div>
+        </header>
 
         {/* FORM */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -265,7 +258,7 @@ export default function RegistrationPage() {
             </div>
           </section>
 
-          {/* Contact Section ✅ RESTORED */}
+          {/* Contact Section */}
           <section className="form-card p-6 md:p-8" data-testid="contact-section">
             <div className="flex items-center gap-3 mb-6">
               <Building2 className="w-6 h-6 text-orange-500" />
@@ -335,7 +328,7 @@ export default function RegistrationPage() {
             </div>
           </section>
 
-          {/* Payment Section ✅ RESTORED */}
+          {/* Payment Section */}
           <section className="form-card p-6 md:p-8" data-testid="payment-section">
             <div className="flex items-center gap-3 mb-6">
               <CreditCard className="w-6 h-6 text-orange-500" />
@@ -395,7 +388,7 @@ export default function RegistrationPage() {
             </div>
           </section>
 
-          {/* Submit ✅ PREMIUM RESTORED */}
+          {/* Submit */}
           <button
             type="submit"
             disabled={isSubmitting}
