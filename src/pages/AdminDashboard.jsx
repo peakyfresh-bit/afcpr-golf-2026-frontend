@@ -38,6 +38,10 @@ export default function AdminDashboard() {
   const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
+  // ✅ Premium Sort (client-side)
+  // date_desc = Newest first (default)
+  const [sortKey, setSortKey] = useState("date_desc"); // date_desc | date_asc | amount_desc | amount_asc
+
   const token = useMemo(() => {
     try {
       return localStorage.getItem(TOKEN_KEY) || "";
@@ -231,6 +235,60 @@ export default function AdminDashboard() {
       });
   }, [items, filterStatus, query]);
 
+  // ✅ Premium Sort (works on the current view: filters + search)
+  const sortedItems = useMemo(() => {
+    const arr = Array.isArray(filteredItems) ? [...filteredItems] : [];
+
+    const getDateMs = (it) => {
+      const raw = it?.created_at || it?.createdAt || it?.created || it?.timestamp || "";
+      const t = raw ? Date.parse(raw) : NaN;
+      return Number.isFinite(t) ? t : 0;
+    };
+
+    const getAmount = (it) => {
+      const raw = it?.amount ?? 0;
+      const n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.]/g, ""));
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    // stable-ish tie-breaker: by id if same value
+    const getId = (it) => String(it?.id || it?._id || "");
+
+    switch (sortKey) {
+      case "date_asc":
+        arr.sort((a, b) => {
+          const d = getDateMs(a) - getDateMs(b);
+          if (d !== 0) return d;
+          return getId(a).localeCompare(getId(b));
+        });
+        break;
+      case "amount_desc":
+        arr.sort((a, b) => {
+          const d = getAmount(b) - getAmount(a);
+          if (d !== 0) return d;
+          return getId(a).localeCompare(getId(b));
+        });
+        break;
+      case "amount_asc":
+        arr.sort((a, b) => {
+          const d = getAmount(a) - getAmount(b);
+          if (d !== 0) return d;
+          return getId(a).localeCompare(getId(b));
+        });
+        break;
+      case "date_desc":
+      default:
+        arr.sort((a, b) => {
+          const d = getDateMs(b) - getDateMs(a);
+          if (d !== 0) return d;
+          return getId(a).localeCompare(getId(b));
+        });
+        break;
+    }
+
+    return arr;
+  }, [filteredItems, sortKey]);
+
   // ✅ Mark Paid
   const tryMarkPaid = async (id) => {
     return axios.patch(
@@ -316,7 +374,7 @@ export default function AdminDashboard() {
     return { paid, pending, total, pct, size, stroke, r, c, dash };
   }, [totalPaidCount, totalPendingCount]);
 
-  // ✅ CSV Export (frontend-only) using filteredItems
+  // ✅ CSV Export (frontend-only) using sortedItems (current view + sort)
   const exportCsv = () => {
     try {
       const headers = [
@@ -340,7 +398,7 @@ export default function AdminDashboard() {
         return cleaned;
       };
 
-      const rows = filteredItems.map((it) => {
+      const rows = sortedItems.map((it) => {
         const id = it?.id || it?._id || "";
         const company = it?.company || it?.organization || "";
         const contact = contactLabel(it);
@@ -380,7 +438,7 @@ export default function AdminDashboard() {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `afcpr_registrations_${filterStatus}_${stamp}.csv`;
+      a.download = `afcpr_registrations_${filterStatus}_${sortKey}_${stamp}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -665,7 +723,7 @@ export default function AdminDashboard() {
 
               {/* Right: Controls */}
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
-                {/* Row 1: Showing + Chips inline */}
+                {/* Row 1: Showing + Chips inline + Sort */}
                 <div className="flex flex-wrap items-center gap-2">
                   <div
                     className="text-xs font-semibold px-3 py-2 rounded-xl border"
@@ -677,7 +735,7 @@ export default function AdminDashboard() {
                     }}
                     title="Number of rows currently shown (after filters + search)"
                   >
-                    Showing: {filteredItems.length}
+                    Showing: {sortedItems.length}
                   </div>
 
                   <button type="button" onClick={() => setFilterStatus("all")} style={chipStyle(filterStatus === "all")}>
@@ -699,6 +757,29 @@ export default function AdminDashboard() {
                   >
                     Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
                   </button>
+
+                  {/* ✅ Premium Sort control */}
+                  <div className="flex items-center gap-2 ml-1">
+                    <span className="text-xs font-semibold" style={{ color: THEME.muted }}>
+                      Sort:
+                    </span>
+                    <select
+                      value={sortKey}
+                      onChange={(e) => setSortKey(e.target.value)}
+                      className="h-[38px] px-3 rounded-xl border text-sm outline-none"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        borderColor: THEME.border2,
+                        color: "rgba(255,255,255,0.90)",
+                      }}
+                      title="Sort current view"
+                    >
+                      <option value="date_desc">Newest</option>
+                      <option value="date_asc">Oldest</option>
+                      <option value="amount_desc">Amount (High → Low)</option>
+                      <option value="amount_asc">Amount (Low → High)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Row 2: Search + Clear */}
@@ -761,10 +842,7 @@ export default function AdminDashboard() {
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Payment
                     </th>
-                    <th
-                      className="text-right font-semibold px-5 py-3 border-b"
-                      style={{ borderColor: THEME.border }}
-                    >
+                    <th className="text-right font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
                       Amount
                     </th>
                     <th className="text-left font-semibold px-5 py-3 border-b" style={{ borderColor: THEME.border }}>
@@ -786,14 +864,14 @@ export default function AdminDashboard() {
                         Loading registrations…
                       </td>
                     </tr>
-                  ) : filteredItems.length === 0 ? (
+                  ) : sortedItems.length === 0 ? (
                     <tr>
                       <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
                         No registrations found.
                       </td>
                     </tr>
                   ) : (
-                    filteredItems.map((it, idx) => {
+                    sortedItems.map((it, idx) => {
                       const status = String(it?.status || "pending").toLowerCase();
                       const isPaid = status === "paid";
                       const rowId = String(it?.id || it?._id || "");
