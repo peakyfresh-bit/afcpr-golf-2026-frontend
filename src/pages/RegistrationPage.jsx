@@ -156,49 +156,62 @@ export default function RegistrationPage() {
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-10 md:px-8 md:py-14">
         {/* HEADER */}
-        <header className="text-center mb-12">
-          <div className="flex justify-center mb-6">
-            <img
-              src={AFCPRLogo}
-              alt="AFCPR Golf Tournament 2026"
-              className="w-[260px] md:w-[320px]"
-              draggable={false}
-            />
-          </div>
+<header className="text-center mb-14">
+  {/* Logo con glow sutil */}
+  <div className="relative flex justify-center mb-10">
+    <div className="absolute inset-0 flex justify-center">
+      <div className="h-32 w-32 rounded-full bg-orange-500/10 blur-3xl" />
+    </div>
 
-          <div className="flex flex-wrap justify-center gap-4 text-gray-300 text-sm md:text-base">
-            <span>
-              <span className="text-orange-500 font-semibold">Día:</span> Jueves 14 de Mayo 2026
-            </span>
-            <span className="text-orange-500/60">|</span>
-            <span>
-              <span className="text-orange-500 font-semibold">Lugar:</span> El Legado Golf Resort
-            </span>
-          </div>
+    <img
+      src={AFCPRLogo}
+      alt="AFCPR Golf Tournament 2026"
+      className="relative w-[250px] md:w-[340px] drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)]"
+      draggable={false}
+    />
+  </div>
 
-          <div className="mt-3 flex flex-wrap justify-center gap-4 text-gray-400 text-sm md:text-base">
-            <span>
-              <span className="text-orange-500 font-semibold">Registro:</span> 7:00 AM
-            </span>
-            <span className="text-orange-500/60">|</span>
-            <span>
-              <span className="text-orange-500 font-semibold">Shotgun:</span> 8:30 AM
-            </span>
-            <span className="text-orange-500/60">|</span>
-            <span>
-              <span className="text-orange-500 font-semibold">Formato:</span> 4 Man Scramble
-            </span>
-          </div>
+  {/* Línea elegante debajo del logo */}
+  <div className="mx-auto mb-8 h-px w-44 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
 
-          {/* AVISO */}
-          <div className="mt-8 max-w-3xl mx-auto bg-orange-500/10 border border-orange-500/40 rounded-xl p-5 text-left">
-            <div className="text-orange-500 font-bold mb-2">Aviso Importante</div>
-            <p className="text-gray-200 text-sm md:text-base leading-6">
-              Si desea reservar su espacio y realizar el pago en la puerta mediante cheque o efectivo, deberá
-              proporcionar una tarjeta de crédito como garantía de pago.
-            </p>
-          </div>
-        </header>
+  {/* Info del evento estilo premium compacto */}
+  <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-4 text-sm md:text-base">
+    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+      <span className="text-orange-500 font-semibold">Día:</span> Jueves 14 de Mayo 2026
+    </span>
+
+    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+      <span className="text-orange-500 font-semibold">Lugar:</span> El Legado Golf Resort
+    </span>
+
+    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+      <span className="text-orange-500 font-semibold">Registro:</span> 7:00 AM
+    </span>
+
+    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+      <span className="text-orange-500 font-semibold">Shotgun:</span> 8:30 AM
+    </span>
+
+    <span className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-gray-200">
+      <span className="text-orange-500 font-semibold">Formato:</span> 4 Man Scramble
+    </span>
+  </div>
+
+  {/* Aviso premium refinado */}
+  <div className="mt-10 max-w-3xl mx-auto rounded-2xl border border-orange-500/30 bg-white/[0.04] backdrop-blur-xl p-6 text-left shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+  <div className="flex items-center gap-3 mb-3">
+    <div className="text-orange-400 font-bold tracking-wide text-sm md:text-base">
+      Aviso Importante
+    </div>
+    <div className="flex-1 h-px bg-gradient-to-r from-orange-500/40 to-transparent" />
+  </div>
+
+  <p className="text-gray-200 text-sm md:text-base leading-6">
+    Si desea reservar su espacio y realizar el pago en la puerta mediante cheque o efectivo,
+    deberá proporcionar una tarjeta de crédito como garantía de pago.
+  </p>
+</div>
+</header>
 
         {/* FORM */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
