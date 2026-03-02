@@ -7,7 +7,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Users, Building2, CreditCard, Mail, Phone, CheckCircle, User } from "lucide-react";
 
-import AFCPRLogo from "../assets/afcpr-golf-logo.png";
+import AFCPRLogo from "../assets/afcpr-golf-logo.webp";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
