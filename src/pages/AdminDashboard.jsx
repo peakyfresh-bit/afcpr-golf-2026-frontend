@@ -1,4 +1,4 @@
-// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v7 PREMIUM+++ (Sort Fix + Sticky Header + Sticky Actions + Copy Code)
+// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v8 PREMIUM++++ (Add Resend Button + Logs Trigger)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -43,6 +43,9 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+
+  // ✅ NEW: resend busy (separate so Mark Paid can still work independently)
+  const [resendBusyId, setResendBusyId] = useState("");
 
   // ✅ Premium controls
   const [filterStatus, setFilterStatus] = useState("all"); // all | paid | pending (pending = NOT paid)
@@ -336,6 +339,29 @@ export default function AdminDashboard() {
       console.error("markPaid error:", err);
     } finally {
       setBusyId("");
+    }
+  };
+
+  // ✅ NEW: Resend confirmation email (creates email_resend_logs when backend supports it)
+  const resendConfirmation = async (it) => {
+    const id = it?.id || it?._id;
+    if (!id) {
+      toast.error("Missing registration id");
+      return;
+    }
+
+    setResendBusyId(String(id));
+    try {
+      await axios.post(`${API}/admin/registrations/${id}/resend`, {}, { headers: authHeader() });
+      toast.success("Confirmation email resent");
+      await fetchRegistrations({ isRefresh: true });
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.message || "Resend failed";
+      toast.error(msg);
+      // eslint-disable-next-line no-console
+      console.error("resendConfirmation error:", err);
+    } finally {
+      setResendBusyId("");
     }
   };
 
@@ -1018,6 +1044,24 @@ export default function AdminDashboard() {
                                 title={code ? `Copy confirmation code: ${code}` : "No confirmation code"}
                               >
                                 Copy Code
+                              </button>
+
+                              {/* ✅ NEW: Resend button */}
+                              <button
+                                type="button"
+                                onClick={() => resendConfirmation(it)}
+                                disabled={!rowId || resendBusyId === rowId}
+                                className="h-9 px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+                                style={{
+                                  background: "rgba(59,130,246,0.10)",
+                                  borderColor: "rgba(59,130,246,0.30)",
+                                  color: "rgba(255,255,255,0.95)",
+                                  opacity: resendBusyId === rowId ? 0.70 : 1,
+                                  cursor: resendBusyId === rowId ? "not-allowed" : "pointer",
+                                }}
+                                title="Resend confirmation email and log the attempt"
+                              >
+                                {resendBusyId === rowId ? "Resending..." : "Resend"}
                               </button>
 
                               <button
