@@ -1,4 +1,4 @@
-// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v5 PREMIUM+ (Filters + Search + Charts + CSV Export)
+// ✅ DEBUG MARKER: ADMIN DASHBOARD THEME v6 PREMIUM++ (Filters + Search + Sort + Pagination + Charts + CSV Export)
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -39,8 +39,12 @@ export default function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   // ✅ Premium Sort (client-side)
-  // date_desc = Newest first (default)
   const [sortKey, setSortKey] = useState("date_desc"); // date_desc | date_asc | amount_desc | amount_asc
+
+  // ✅ Premium Pagination (client-side)
+  // pageSize: 10 | 25 | 50 | "all"
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
 
   const token = useMemo(() => {
     try {
@@ -76,7 +80,7 @@ export default function AdminDashboard() {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() === "paid").length;
   }, [items]);
 
-  // ✅ Pending = NOT paid (Opción 1)
+  // ✅ Pending = NOT paid
   const totalPendingCount = useMemo(() => {
     return (items || []).filter((it) => String(it?.status || "").toLowerCase() !== "paid").length;
   }, [items]);
@@ -213,7 +217,7 @@ export default function AdminDashboard() {
       .filter((it) => {
         const status = String(it?.status || "").toLowerCase();
         if (filterStatus === "paid") return status === "paid";
-        if (filterStatus === "pending") return status !== "paid"; // ✅ option 1
+        if (filterStatus === "pending") return status !== "paid";
         return true; // all
       })
       .filter((it) => {
@@ -251,7 +255,6 @@ export default function AdminDashboard() {
       return Number.isFinite(n) ? n : 0;
     };
 
-    // stable-ish tie-breaker: by id if same value
     const getId = (it) => String(it?.id || it?._id || "");
 
     switch (sortKey) {
@@ -288,6 +291,46 @@ export default function AdminDashboard() {
 
     return arr;
   }, [filteredItems, sortKey]);
+
+  // ✅ Reset page when view changes (filters/search/sort/pageSize)
+  useEffect(() => {
+    setPage(1);
+  }, [filterStatus, query, sortKey, pageSize]);
+
+  // ✅ Pagination calculations (client-side)
+  const totalRows = sortedItems.length;
+
+  const effectivePageSize = useMemo(() => {
+    if (pageSize === "all") return Math.max(1, totalRows || 1);
+    const n = Number(pageSize);
+    return Number.isFinite(n) && n > 0 ? n : 25;
+  }, [pageSize, totalRows]);
+
+  const totalPages = useMemo(() => {
+    if (!totalRows) return 1;
+    return Math.max(1, Math.ceil(totalRows / effectivePageSize));
+  }, [totalRows, effectivePageSize]);
+
+  const currentPage = useMemo(() => {
+    return Math.min(Math.max(1, page), totalPages);
+  }, [page, totalPages]);
+
+  const pagedItems = useMemo(() => {
+    if (!totalRows) return [];
+    if (pageSize === "all") return sortedItems;
+    const start = (currentPage - 1) * effectivePageSize;
+    return sortedItems.slice(start, start + effectivePageSize);
+  }, [sortedItems, currentPage, effectivePageSize, totalRows, pageSize]);
+
+  const pageStart = useMemo(() => {
+    if (!totalRows) return 0;
+    return (currentPage - 1) * effectivePageSize + 1;
+  }, [currentPage, effectivePageSize, totalRows]);
+
+  const pageEnd = useMemo(() => {
+    if (!totalRows) return 0;
+    return Math.min(totalRows, (currentPage - 1) * effectivePageSize + pagedItems.length);
+  }, [currentPage, effectivePageSize, totalRows, pagedItems.length]);
 
   // ✅ Mark Paid
   const tryMarkPaid = async (id) => {
@@ -374,7 +417,7 @@ export default function AdminDashboard() {
     return { paid, pending, total, pct, size, stroke, r, c, dash };
   }, [totalPaidCount, totalPendingCount]);
 
-  // ✅ CSV Export (frontend-only) using sortedItems (current view + sort)
+  // ✅ CSV Export (frontend-only) using pagedItems (CURRENT VIEW = what you see)
   const exportCsv = () => {
     try {
       const headers = [
@@ -398,7 +441,7 @@ export default function AdminDashboard() {
         return cleaned;
       };
 
-      const rows = sortedItems.map((it) => {
+      const rows = pagedItems.map((it) => {
         const id = it?.id || it?._id || "";
         const company = it?.company || it?.organization || "";
         const contact = contactLabel(it);
@@ -438,7 +481,7 @@ export default function AdminDashboard() {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `afcpr_registrations_${filterStatus}_${sortKey}_${stamp}.csv`;
+      a.download = `afcpr_registrations_${filterStatus}_${sortKey}_page-${currentPage}_${stamp}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -671,12 +714,12 @@ export default function AdminDashboard() {
                     color: "rgba(255,255,255,0.95)",
                     width: "100%",
                   }}
-                  title="Export the current view (filters + search) to CSV"
+                  title="Export the current view (filters + search + sort + page) to CSV"
                 >
                   Export CSV (Current View)
                 </button>
                 <div className="mt-2 text-xs" style={{ color: THEME.muted }}>
-                  Exports what you see: {filterStatus.toUpperCase()} + Search
+                  Exports what you see: {filterStatus.toUpperCase()} + Search + Sort + Page
                 </div>
               </div>
             </div>
@@ -701,7 +744,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ✅ Premium toolbar (FIXED: Showing + All + Pending + Paid inline) */}
+          {/* ✅ Premium toolbar */}
           <div
             className="mt-6 rounded-2xl border px-5 py-4"
             style={{
@@ -711,7 +754,6 @@ export default function AdminDashboard() {
             }}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              {/* Left: Title + subtitle */}
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base sm:text-lg font-semibold">Registrations</h2>
@@ -721,9 +763,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Right: Controls */}
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
-                {/* Row 1: Showing + Chips inline + Sort */}
+                {/* Row 1: Showing + Chips + Sort + Page Size + Pager */}
                 <div className="flex flex-wrap items-center gap-2">
                   <div
                     className="text-xs font-semibold px-3 py-2 rounded-xl border"
@@ -733,9 +774,12 @@ export default function AdminDashboard() {
                       color: "rgba(255,255,255,0.82)",
                       lineHeight: 1,
                     }}
-                    title="Number of rows currently shown (after filters + search)"
+                    title="Rows shown on this page"
                   >
-                    Showing: {sortedItems.length}
+                    Showing: {pagedItems.length}{" "}
+                    <span style={{ color: THEME.muted, fontWeight: 700 }}>
+                      ({pageStart}-{pageEnd} of {totalRows})
+                    </span>
                   </div>
 
                   <button type="button" onClick={() => setFilterStatus("all")} style={chipStyle(filterStatus === "all")}>
@@ -758,7 +802,7 @@ export default function AdminDashboard() {
                     Paid <span style={{ color: THEME.muted }}>{totalPaidCount}</span>
                   </button>
 
-                  {/* ✅ Premium Sort control */}
+                  {/* Sort */}
                   <div className="flex items-center gap-2 ml-1">
                     <span className="text-xs font-semibold" style={{ color: THEME.muted }}>
                       Sort:
@@ -779,6 +823,82 @@ export default function AdminDashboard() {
                       <option value="amount_desc">Amount (High → Low)</option>
                       <option value="amount_asc">Amount (Low → High)</option>
                     </select>
+                  </div>
+
+                  {/* Page size */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold" style={{ color: THEME.muted }}>
+                      Show:
+                    </span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPageSize(v === "all" ? "all" : Number(v));
+                      }}
+                      className="h-[38px] px-3 rounded-xl border text-sm outline-none"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        borderColor: THEME.border2,
+                        color: "rgba(255,255,255,0.90)",
+                      }}
+                      title="Rows per page"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value="all">All</option>
+                    </select>
+                  </div>
+
+                  {/* Pager */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      className="h-[38px] px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        borderColor: THEME.border2,
+                        color: "rgba(255,255,255,0.90)",
+                        opacity: currentPage <= 1 ? 0.5 : 1,
+                        cursor: currentPage <= 1 ? "not-allowed" : "pointer",
+                      }}
+                      title="Previous page"
+                    >
+                      Prev
+                    </button>
+
+                    <div
+                      className="text-xs font-semibold px-3 py-2 rounded-xl border"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        borderColor: THEME.border2,
+                        color: "rgba(255,255,255,0.82)",
+                        lineHeight: 1,
+                      }}
+                      title="Current page"
+                    >
+                      Page {currentPage} / {totalPages}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="h-[38px] px-3 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        borderColor: THEME.border2,
+                        color: "rgba(255,255,255,0.90)",
+                        opacity: currentPage >= totalPages ? 0.5 : 1,
+                        cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
+                      }}
+                      title="Next page"
+                    >
+                      Next
+                    </button>
                   </div>
                 </div>
 
@@ -864,14 +984,14 @@ export default function AdminDashboard() {
                         Loading registrations…
                       </td>
                     </tr>
-                  ) : sortedItems.length === 0 ? (
+                  ) : pagedItems.length === 0 ? (
                     <tr>
                       <td className="px-5 py-6" colSpan={9} style={{ color: THEME.subtext }}>
                         No registrations found.
                       </td>
                     </tr>
                   ) : (
-                    sortedItems.map((it, idx) => {
+                    pagedItems.map((it, idx) => {
                       const status = String(it?.status || "pending").toLowerCase();
                       const isPaid = status === "paid";
                       const rowId = String(it?.id || it?._id || "");
